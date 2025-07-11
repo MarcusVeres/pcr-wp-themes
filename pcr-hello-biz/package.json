@@ -1,0 +1,21 @@
+{
+  "name": "pcr-hello-biz-child-theme",
+  "version": "1.0.0",
+  "description": "Build scripts for PCR Hello Biz Child Theme",
+  "scripts": {
+    "build": "node build.js",
+    "build:patch": "node build.js patch",
+    "build:minor": "node build.js minor",
+    "build:major": "node build.js major"
+  },
+  "devDependencies": {
+    "archiver": "^6.0.1"
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:MarcusVeres/pcr-wp-themes.git"
+  },
+  "author": "Marcus & Claude",
+  "license": "ISC"
+}
