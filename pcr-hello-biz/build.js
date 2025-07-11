@@ -3,7 +3,7 @@ const path = require('path');
 const archiver = require('archiver');
 
 // Configuration
-const THEME_CSS_FILE = 'styles.css';
+const THEME_CSS_FILE = 'style.css';
 const BUILD_DIR = 'builds';
 const THEME_NAME = 'pcr-hello-biz-child';
 
@@ -22,7 +22,7 @@ const EXCLUDE_FILES = [
 ];
 
 /**
- * Parse version from styles.css
+ * Parse version from style.css
  */
 function getCurrentVersion() {
     try {
@@ -30,7 +30,7 @@ function getCurrentVersion() {
         const versionMatch = cssContent.match(/Version:\s*([0-9]+\.[0-9]+\.[0-9]+)/);
         
         if (!versionMatch) {
-            throw new Error('Version not found in styles.css');
+            throw new Error('Version not found in style.css');
         }
         
         return versionMatch[1];
@@ -66,7 +66,7 @@ function incrementVersion(version, type = 'patch') {
 }
 
 /**
- * Update version in styles.css
+ * Update version in style.css
  */
 function updateVersionInCSS(newVersion) {
     try {
