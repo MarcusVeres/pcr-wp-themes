@@ -1,0 +1,53 @@
+/*
+Theme Name: Hello Biz Child Theme for PCR
+Description: Perfect Circle Records eCommerce Site - Child theme for Hello Biz
+Template: hello-biz
+Version: 1.0.0
+*/
+
+/* 
+=================================================
+CHILD THEME CUSTOM STYLES
+Add your custom CSS below this line
+=================================================
+*/
+
+/* Example: Custom styles for vinyl records site */
+.vinyl-record-product {
+    /* Custom product styling */
+}
+
+.vinyl-genre-filter {
+    /* Custom filter styling */
+}
+
+/* WooCommerce customizations */
+.woocommerce {
+    /* Custom WooCommerce styling */
+}
+
+/* Elementor customizations */
+.elementor-section {
+    /* Custom section styling */
+}
+
+/* ACF field customizations */
+.acf-field {
+    /* Custom ACF field styling */
+}
+
+/* 
+=================================================
+RESPONSIVE DESIGN
+=================================================
+*/
+
+/* Tablet styles */
+@media (max-width: 1024px) {
+    
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+    
+}
