@@ -107,7 +107,7 @@ function shouldExclude(fileName) {
  */
 function createZip(version) {
     return new Promise((resolve, reject) => {
-        const zipFileName = `${THEME_NAME}-v${version}.zip`;
+        const zipFileName = `${THEME_NAME}-v${version}.zip`; // Include version in zip filename
         const zipPath = path.join(BUILD_DIR, zipFileName);
         
         const output = fs.createWriteStream(zipPath);
@@ -144,7 +144,9 @@ function createZip(version) {
                 if (stats.isDirectory()) {
                     addDirectory(fullPath, relativePath);
                 } else {
-                    archive.file(fullPath, { name: relativePath });
+                    // Prefix all file paths with THEME_NAME → Avoids unzipped folder having different name
+                    const archivePath = path.join(THEME_NAME, relativePath);
+                    archive.file(fullPath, { name: archivePath });
                 }
             });
         };
