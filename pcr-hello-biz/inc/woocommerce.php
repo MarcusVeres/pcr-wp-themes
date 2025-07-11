@@ -133,5 +133,72 @@ function pcr_get_product_artist_link($product_id = null) {
 }
 
 /**
+ * Shortcode to display artist link [pcr_artist_link]
+ */
+function pcr_artist_link_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'id' => null,
+        'format' => 'link', // 'link' or 'name'
+    ), $atts);
+    
+    $product_id = $atts['id'] ? $atts['id'] : get_the_ID();
+    
+    if ($atts['format'] === 'name') {
+        return pcr_get_product_artist($product_id);
+    } else {
+        return pcr_get_product_artist_link($product_id);
+    }
+}
+add_shortcode('pcr_artist_link', 'pcr_artist_link_shortcode');
+
+/**
+ * Shortcode to display product title without artist [pcr_album_title]
+ */
+function pcr_album_title_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'id' => null,
+    ), $atts);
+    
+    $product_id = $atts['id'] ? $atts['id'] : get_the_ID();
+    $full_title = get_the_title($product_id);
+    $artist_name = pcr_get_product_artist($product_id);
+    
+    if (empty($artist_name)) {
+        return $full_title;
+    }
+    
+    // Remove artist name + any separators from the beginning
+    $pattern = '/^' . preg_quote($artist_name, '/') . '\s*[-–—]*\s*/';
+    $album_title = preg_replace($pattern, '', $full_title);
+    
+    return trim($album_title);
+}
+add_shortcode('pcr_album_title', 'pcr_album_title_shortcode');
+
+/**
+ * Modify product title to include clickable artist link
+ * (Optional - uncomment if you want automatic artist links in titles)
+ */
+/*
+function pcr_modify_product_title($title, $id) {
+    if (is_admin() || !is_product()) {
+        return $title;
+    }
+    
+    $artist_link = pcr_get_product_artist_link($id);
+    if ($artist_link) {
+        // Replace "Artist - Album" with "Artist_Link - Album"
+        $artist_name = pcr_get_product_artist($id);
+        if (strpos($title, $artist_name . ' - ') === 0) {
+            $title = str_replace($artist_name . ' - ', $artist_link . ' - ', $title);
+        }
+    }
+    
+    return $title;
+}
+add_filter('the_title', 'pcr_modify_product_title', 10, 2);
+*/
+
+/**
  * Your other WooCommerce customizations go below this line
  */
