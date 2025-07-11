@@ -153,51 +153,42 @@ add_shortcode('pcr_artist_link', 'pcr_artist_link_shortcode');
 
 /**
  * Shortcode to display product title without artist [pcr_album_title]
+ * Simple approach: find artist, remove it, remove any separator that follows
  */
 function pcr_album_title_shortcode($atts) {
     $atts = shortcode_atts(array(
         'id' => null,
+        'strip_separators' => true, // set to false if you want to keep separators
     ), $atts);
     
     $product_id = $atts['id'] ? $atts['id'] : get_the_ID();
     $full_title = get_the_title($product_id);
     $artist_name = pcr_get_product_artist($product_id);
     
+    // If no artist, return full title
     if (empty($artist_name)) {
         return $full_title;
     }
     
-    // Remove artist name + any separators from the beginning
-    $pattern = '/^' . preg_quote($artist_name, '/') . '\s*[-–—]*\s*/';
-    $album_title = preg_replace($pattern, '', $full_title);
+    // Simple string replacement - remove artist from beginning
+    if (strpos($full_title, $artist_name) === 0) {
+        $album_title = substr($full_title, strlen($artist_name));
+        
+        // If strip_separators is true, remove common separators from the start
+        if ($atts['strip_separators']) {
+            $album_title = ltrim($album_title, " \t\n\r\0\x0B-–—‒⁃");
+        }
+        
+        $album_title = trim($album_title);
+        
+        // If nothing left after stripping, return original
+        return empty($album_title) ? $full_title : $album_title;
+    }
     
-    return trim($album_title);
+    // Artist not at beginning? Return full title
+    return $full_title;
 }
 add_shortcode('pcr_album_title', 'pcr_album_title_shortcode');
-
-/**
- * Modify product title to include clickable artist link
- * (Optional - uncomment if you want automatic artist links in titles)
- */
-/*
-function pcr_modify_product_title($title, $id) {
-    if (is_admin() || !is_product()) {
-        return $title;
-    }
-    
-    $artist_link = pcr_get_product_artist_link($id);
-    if ($artist_link) {
-        // Replace "Artist - Album" with "Artist_Link - Album"
-        $artist_name = pcr_get_product_artist($id);
-        if (strpos($title, $artist_name . ' - ') === 0) {
-            $title = str_replace($artist_name . ' - ', $artist_link . ' - ', $title);
-        }
-    }
-    
-    return $title;
-}
-add_filter('the_title', 'pcr_modify_product_title', 10, 2);
-*/
 
 /**
  * Your other WooCommerce customizations go below this line
