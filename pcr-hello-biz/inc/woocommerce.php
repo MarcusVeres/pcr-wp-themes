@@ -191,5 +191,150 @@ function pcr_album_title_shortcode($atts) {
 add_shortcode('pcr_album_title', 'pcr_album_title_shortcode');
 
 /**
- * Your other WooCommerce customizations go below this line
+ * Shortcode to display all artists [pcr_artists_list]
  */
+function pcr_artists_list_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'columns' => 3,           // Number of columns
+        'orderby' => 'name',      // name, count, slug
+        'order' => 'ASC',         // ASC or DESC
+        'show_count' => false,    // Show product count
+        'style' => 'grid',        // grid or list
+        'hide_empty' => true,     // Hide artists with no products
+    ), $atts);
+    
+    // Get all artist terms
+    $artists = get_terms(array(
+        'taxonomy' => 'product_artist',
+        'hide_empty' => $atts['hide_empty'],
+        'orderby' => $atts['orderby'],
+        'order' => $atts['order'],
+    ));
+    
+    if (empty($artists) || is_wp_error($artists)) {
+        return '<p>No artists found.</p>';
+    }
+    
+    $output = '';
+    
+    if ($atts['style'] === 'grid') {
+        $output .= '<div class="pcr-artists-grid" style="display: grid; grid-template-columns: repeat(' . $atts['columns'] . ', 1fr); gap: 20px; margin-bottom: 30px;">';
+        
+        foreach ($artists as $artist) {
+            $artist_url = get_term_link($artist);
+            $count_text = $atts['show_count'] ? ' (' . $artist->count . ')' : '';
+            
+            $output .= '<div class="pcr-artist-card" style="border: 1px solid #ddd; padding: 20px; text-align: center; border-radius: 5px; transition: box-shadow 0.3s;">';
+            $output .= '<h3 style="margin: 0 0 10px 0; font-size: 18px;">';
+            $output .= '<a href="' . esc_url($artist_url) . '" style="text-decoration: none; color: inherit;">' . esc_html($artist->name) . '</a>';
+            $output .= '</h3>';
+            
+            if ($atts['show_count']) {
+                $output .= '<p style="margin: 0; color: #666; font-size: 14px;">' . $artist->count . ' ' . ($artist->count == 1 ? 'album' : 'albums') . '</p>';
+            }
+            
+            $output .= '</div>';
+        }
+        
+        $output .= '</div>';
+        
+        // Add some CSS for hover effects
+        $output .= '<style>
+            .pcr-artist-card:hover {
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            .pcr-artist-card a:hover {
+                color: #0073aa;
+            }
+        </style>';
+        
+    } else {
+        // List style
+        $output .= '<div class="pcr-artists-list">';
+        $output .= '<ul style="list-style: none; padding: 0; columns: ' . $atts['columns'] . '; column-gap: 30px;">';
+        
+        foreach ($artists as $artist) {
+            $artist_url = get_term_link($artist);
+            $count_text = $atts['show_count'] ? ' (' . $artist->count . ')' : '';
+            
+            $output .= '<li style="margin-bottom: 10px; break-inside: avoid;">';
+            $output .= '<a href="' . esc_url($artist_url) . '" style="text-decoration: none; font-size: 16px;">' . esc_html($artist->name) . '</a>';
+            $output .= $count_text;
+            $output .= '</li>';
+        }
+        
+        $output .= '</ul>';
+        $output .= '</div>';
+    }
+    
+    return $output;
+}
+add_shortcode('pcr_artists_list', 'pcr_artists_list_shortcode');
+
+/**
+ * Shortcode for alphabetical artist index [pcr_artists_index]
+ */
+function pcr_artists_index_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'show_count' => false,
+        'hide_empty' => true,
+    ), $atts);
+    
+    // Get all artist terms
+    $artists = get_terms(array(
+        'taxonomy' => 'product_artist',
+        'hide_empty' => $atts['hide_empty'],
+        'orderby' => 'name',
+        'order' => 'ASC',
+    ));
+    
+    if (empty($artists) || is_wp_error($artists)) {
+        return '<p>No artists found.</p>';
+    }
+    
+    // Group artists by first letter
+    $grouped_artists = array();
+    foreach ($artists as $artist) {
+        $first_letter = strtoupper(substr($artist->name, 0, 1));
+        if (!isset($grouped_artists[$first_letter])) {
+            $grouped_artists[$first_letter] = array();
+        }
+        $grouped_artists[$first_letter][] = $artist;
+    }
+    
+    ksort($grouped_artists);
+    
+    $output = '<div class="pcr-artists-index">';
+    
+    // Create alphabet navigation
+    $output .= '<div class="alphabet-nav" style="margin-bottom: 30px; text-align: center;">';
+    foreach ($grouped_artists as $letter => $artists_in_letter) {
+        $output .= '<a href="#letter-' . $letter . '" style="margin: 0 5px; padding: 5px 10px; background: #f0f0f0; text-decoration: none; border-radius: 3px;">' . $letter . '</a>';
+    }
+    $output .= '</div>';
+    
+    // Display artists grouped by letter
+    foreach ($grouped_artists as $letter => $artists_in_letter) {
+        $output .= '<div id="letter-' . $letter . '" class="letter-group" style="margin-bottom: 30px;">';
+        $output .= '<h3 style="font-size: 24px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">' . $letter . '</h3>';
+        $output .= '<div style="columns: 3; column-gap: 30px;">';
+        
+        foreach ($artists_in_letter as $artist) {
+            $artist_url = get_term_link($artist);
+            $count_text = $atts['show_count'] ? ' (' . $artist->count . ')' : '';
+            
+            $output .= '<div style="margin-bottom: 8px; break-inside: avoid;">';
+            $output .= '<a href="' . esc_url($artist_url) . '" style="text-decoration: none;">' . esc_html($artist->name) . '</a>';
+            $output .= $count_text;
+            $output .= '</div>';
+        }
+        
+        $output .= '</div>';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>';
+    
+    return $output;
+}
+add_shortcode('pcr_artists_index', 'pcr_artists_index_shortcode');
