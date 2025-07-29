@@ -1,0 +1,33 @@
+{
+  "name": "pcr-discogs-api-plugin",
+  "version": "1.0.0",
+  "description": "Build scripts for PCR Discogs API WordPress Plugin",
+  "scripts": {
+    "build": "node build.js",
+    "build:patch": "node build.js patch",
+    "build:minor": "node build.js minor",
+    "build:major": "node build.js major"
+  },
+  "devDependencies": {
+    "archiver": "^6.0.1"
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:MarcusVeres/pcr-wp-plugins.git"
+  },
+  "author": "Marcus & Claude",
+  "license": "GPL-2.0-or-later",
+  "keywords": [
+    "wordpress",
+    "plugin",
+    "discogs",
+    "api",
+    "vinyl",
+    "records",
+    "woocommerce"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
