@@ -338,3 +338,235 @@ function pcr_artists_index_shortcode($atts) {
     return $output;
 }
 add_shortcode('pcr_artists_index', 'pcr_artists_index_shortcode');
+
+// --------------------------------------------------------------
+
+/**
+ * Shortcode to display product categories [pcr_categories_list]
+ * Simple list format, just like artists
+ */
+function pcr_categories_list_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'columns' => 3,           // Number of columns
+        'orderby' => 'name',      // name, count, slug
+        'order' => 'ASC',         // ASC or DESC
+        'show_count' => false,    // Show product count
+        'hide_empty' => true,     // Hide categories with no products
+    ), $atts);
+    
+    // Get all product categories (flat, no hierarchy)
+    $categories = get_terms(array(
+        'taxonomy' => 'product_cat',
+        'hide_empty' => $atts['hide_empty'],
+        'orderby' => $atts['orderby'],
+        'order' => $atts['order'],
+    ));
+    
+    if (empty($categories) || is_wp_error($categories)) {
+        return '<p>No categories found.</p>';
+    }
+    
+    $output = '<div class="pcr-categories-list">';
+    $output .= '<ul style="list-style: none; padding: 0; columns: ' . $atts['columns'] . '; column-gap: 30px;">';
+    
+    foreach ($categories as $category) {
+        $category_url = get_term_link($category);
+        $count_text = $atts['show_count'] ? ' (' . $category->count . ')' : '';
+        
+        $output .= '<li style="margin-bottom: 10px; break-inside: avoid;">';
+        $output .= '<a href="' . esc_url($category_url) . '" style="text-decoration: none; font-size: 16px;">' . esc_html($category->name) . '</a>';
+        $output .= $count_text;
+        $output .= '</li>';
+    }
+    
+    $output .= '</ul>';
+    $output .= '</div>';
+    
+    return $output;
+}
+add_shortcode('pcr_categories_list', 'pcr_categories_list_shortcode');
+
+/**
+ * Shortcode to display product tags [pcr_tags_list]
+ * Simple list format, just like artists
+ */
+function pcr_tags_list_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'columns' => 4,           // Number of columns
+        'orderby' => 'name',      // name, count, slug
+        'order' => 'ASC',         // ASC or DESC
+        'show_count' => false,    // Show product count
+        'hide_empty' => true,     // Hide tags with no products
+    ), $atts);
+    
+    // Get all product tags
+    $tags = get_terms(array(
+        'taxonomy' => 'product_tag',
+        'hide_empty' => $atts['hide_empty'],
+        'orderby' => $atts['orderby'],
+        'order' => $atts['order'],
+    ));
+    
+    if (empty($tags) || is_wp_error($tags)) {
+        return '<p>No tags found.</p>';
+    }
+    
+    $output = '<div class="pcr-tags-list">';
+    $output .= '<ul style="list-style: none; padding: 0; columns: ' . $atts['columns'] . '; column-gap: 30px;">';
+    
+    foreach ($tags as $tag) {
+        $tag_url = get_term_link($tag);
+        $count_text = $atts['show_count'] ? ' (' . $tag->count . ')' : '';
+        
+        $output .= '<li style="margin-bottom: 8px; break-inside: avoid;">';
+        $output .= '<a href="' . esc_url($tag_url) . '" style="text-decoration: none; font-size: 16px;">' . esc_html($tag->name) . '</a>';
+        $output .= $count_text;
+        $output .= '</li>';
+    }
+    
+    $output .= '</ul>';
+    $output .= '</div>';
+    
+    return $output;
+}
+add_shortcode('pcr_tags_list', 'pcr_tags_list_shortcode');
+
+/**
+ * Shortcode for alphabetical categories index [pcr_categories_index]
+ * Just like the artists index, simple and clean
+ */
+function pcr_categories_index_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'columns' => 3,           // Number of columns (now works!)
+        'show_count' => false,
+        'hide_empty' => true,
+    ), $atts);
+    
+    // Get all categories (flat, no hierarchy complications)
+    $categories = get_terms(array(
+        'taxonomy' => 'product_cat',
+        'hide_empty' => $atts['hide_empty'],
+        'orderby' => 'name',
+        'order' => 'ASC',
+    ));
+    
+    if (empty($categories) || is_wp_error($categories)) {
+        return '<p>No categories found.</p>';
+    }
+    
+    // Group categories by first letter
+    $grouped_categories = array();
+    foreach ($categories as $category) {
+        $first_letter = strtoupper(substr($category->name, 0, 1));
+        if (!isset($grouped_categories[$first_letter])) {
+            $grouped_categories[$first_letter] = array();
+        }
+        $grouped_categories[$first_letter][] = $category;
+    }
+    
+    ksort($grouped_categories);
+    
+    $output = '<div class="pcr-categories-index">';
+    
+    // Create alphabet navigation
+    $output .= '<div class="alphabet-nav" style="margin-bottom: 30px; text-align: center;">';
+    foreach ($grouped_categories as $letter => $cats_in_letter) {
+        $output .= '<a href="#cat-letter-' . $letter . '" style="margin: 0 5px; padding: 5px 10px; background: #f0f0f0; text-decoration: none; border-radius: 3px;">' . $letter . '</a>';
+    }
+    $output .= '</div>';
+    
+    // Display categories grouped by letter
+    foreach ($grouped_categories as $letter => $cats_in_letter) {
+        $output .= '<div id="cat-letter-' . $letter . '" class="letter-group" style="margin-bottom: 30px;">';
+        $output .= '<h3 style="font-size: 24px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">' . $letter . '</h3>';
+        $output .= '<div style="columns: ' . $atts['columns'] . '; column-gap: 30px;">';
+        
+        foreach ($cats_in_letter as $category) {
+            $category_url = get_term_link($category);
+            $count_text = $atts['show_count'] ? ' (' . $category->count . ')' : '';
+            
+            $output .= '<div style="margin-bottom: 8px; break-inside: avoid;">';
+            $output .= '<a href="' . esc_url($category_url) . '" style="text-decoration: none;">' . esc_html($category->name) . '</a>';
+            $output .= $count_text;
+            $output .= '</div>';
+        }
+        
+        $output .= '</div>';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>';
+    
+    return $output;
+}
+add_shortcode('pcr_categories_index', 'pcr_categories_index_shortcode');
+
+/**
+ * Shortcode for alphabetical tags index [pcr_tags_index]
+ * Just like the artists index, simple and clean
+ */
+function pcr_tags_index_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'columns' => 4,           // Number of columns (now works!)
+        'show_count' => false,
+        'hide_empty' => true,
+    ), $atts);
+    
+    // Get all tags
+    $tags = get_terms(array(
+        'taxonomy' => 'product_tag',
+        'hide_empty' => $atts['hide_empty'],
+        'orderby' => 'name',
+        'order' => 'ASC',
+    ));
+    
+    if (empty($tags) || is_wp_error($tags)) {
+        return '<p>No tags found.</p>';
+    }
+    
+    // Group tags by first letter
+    $grouped_tags = array();
+    foreach ($tags as $tag) {
+        $first_letter = strtoupper(substr($tag->name, 0, 1));
+        if (!isset($grouped_tags[$first_letter])) {
+            $grouped_tags[$first_letter] = array();
+        }
+        $grouped_tags[$first_letter][] = $tag;
+    }
+    
+    ksort($grouped_tags);
+    
+    $output = '<div class="pcr-tags-index">';
+    
+    // Create alphabet navigation
+    $output .= '<div class="alphabet-nav" style="margin-bottom: 30px; text-align: center;">';
+    foreach ($grouped_tags as $letter => $tags_in_letter) {
+        $output .= '<a href="#tag-letter-' . $letter . '" style="margin: 0 5px; padding: 5px 10px; background: #f0f0f0; text-decoration: none; border-radius: 3px;">' . $letter . '</a>';
+    }
+    $output .= '</div>';
+    
+    // Display tags grouped by letter
+    foreach ($grouped_tags as $letter => $tags_in_letter) {
+        $output .= '<div id="tag-letter-' . $letter . '" class="letter-group" style="margin-bottom: 30px;">';
+        $output .= '<h3 style="font-size: 24px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">' . $letter . '</h3>';
+        $output .= '<div style="columns: ' . $atts['columns'] . '; column-gap: 30px;">';
+        
+        foreach ($tags_in_letter as $tag) {
+            $tag_url = get_term_link($tag);
+            $count_text = $atts['show_count'] ? ' (' . $tag->count . ')' : '';
+            
+            $output .= '<div style="margin-bottom: 8px; break-inside: avoid;">';
+            $output .= '<a href="' . esc_url($tag_url) . '" style="text-decoration: none;">' . esc_html($tag->name) . '</a>';
+            $output .= $count_text;
+            $output .= '</div>';
+        }
+        
+        $output .= '</div>';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>';
+    
+    return $output;
+}
+add_shortcode('pcr_tags_index', 'pcr_tags_index_shortcode');
