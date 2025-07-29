@@ -16,6 +16,8 @@ define('CHILD_THEME_URL', get_stylesheet_directory_uri());
  * Core theme setup - always loaded
  */
 require_once CHILD_THEME_DIR . '/inc/theme-setup.php';
+require_once CHILD_THEME_DIR . '/inc/scroll-admin.php';
+require_once CHILD_THEME_DIR . '/inc/scroll-utilities.php';
 
 /**
  * Conditional includes - only load when plugins are active
