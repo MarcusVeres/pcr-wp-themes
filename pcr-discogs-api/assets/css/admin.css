@@ -1,6 +1,6 @@
 /*
  * PCR Discogs API - Admin Styles
- * Version: 1.0.0
+ * Version: 1.0.2
  */
 
 /* Admin page styling */
@@ -50,6 +50,14 @@
     background-color: #ffb900;
 }
 
+.pcr-api-status {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border-left: 4px solid #46b450;
+}
+
 /* Settings form styling */
 .pcr-settings-section {
     margin: 20px 0;
@@ -69,6 +77,63 @@
     font-family: 'Courier New', monospace;
     font-size: 14px;
     padding: 8px 12px;
+}
+
+/* Meta box styling */
+.pcr-discogs-meta-box {
+    padding: 15px 0;
+}
+
+.pcr-discogs-meta-box .pcr-notice {
+    padding: 8px 12px;
+    margin: 10px 0;
+    border-radius: 3px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.pcr-discogs-meta-box .pcr-notice.error {
+    background: #ffeaa7;
+    border-left: 4px solid #e17055;
+    color: #2d3436;
+}
+
+.pcr-discogs-meta-box .pcr-notice.warning {
+    background: #ffeaa7;
+    border-left: 4px solid #fdcb6e;
+    color: #2d3436;
+}
+
+.pcr-discogs-meta-box .pcr-notice.success {
+    background: #d4edda;
+    border-left: 4px solid #00b894;
+    color: #2d3436;
+}
+
+.pcr-discogs-meta-box .pcr-notice.info {
+    background: #dbeafe;
+    border-left: 4px solid #3b82f6;
+    color: #1e3a8a;
+}
+
+.pcr-download-status {
+    margin-top: 15px;
+}
+
+.pcr-download-images {
+    width: 100%;
+    padding: 8px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Test result styling */
+.pcr-test-result {
+    margin-top: 15px;
+}
+
+.pcr-test-result .pcr-notice {
+    margin: 10px 0;
 }
 
 /* Button styling */
@@ -102,6 +167,58 @@
     color: #8b2635;
 }
 
+/* Loading spinner */
+.pcr-loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: pcr-spin 1s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes pcr-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* General notice styling */
+.pcr-notice {
+    padding: 12px;
+    margin: 15px 0;
+    border-left: 4px solid #0073aa;
+    background: #fff;
+    box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
+    border-radius: 3px;
+}
+
+.pcr-notice p {
+    margin: 0;
+}
+
+.pcr-notice.success {
+    border-left-color: #46b450;
+    background: #f0fff4;
+}
+
+.pcr-notice.warning {
+    border-left-color: #ffb900;
+    background: #fffef7;
+}
+
+.pcr-notice.error {
+    border-left-color: #dc3232;
+    background: #fff5f5;
+}
+
+.pcr-notice.info {
+    border-left-color: #0073aa;
+    background: #f0f8ff;
+}
+
 /* Responsive design */
 @media (max-width: 782px) {
     .pcr-discogs-admin {
@@ -116,42 +233,30 @@
     .pcr-api-token-field {
         max-width: 100%;
     }
+    
+    .pcr-download-images {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
 }
 
-/* Loading spinner */
-.pcr-loading {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #0073aa;
-    border-radius: 50%;
-    animation: pcr-spin 1s linear infinite;
-    margin-right: 10px;
-}
-
-@keyframes pcr-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* Notice styling */
-.pcr-notice {
-    padding: 12px;
-    margin: 15px 0;
-    border-left: 4px solid #0073aa;
+/* Product edit screen specific styling */
+.post-type-product .pcr-discogs-meta-box {
     background: #fff;
-    box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
 }
 
-.pcr-notice.success {
-    border-left-color: #46b450;
+.post-type-product .pcr-discogs-meta-box strong {
+    color: #23282d;
 }
 
-.pcr-notice.warning {
-    border-left-color: #ffb900;
+/* Success state for buttons */
+.button.success {
+    background: #46b450 !important;
+    border-color: #46b450 !important;
+    color: #fff !important;
 }
 
-.pcr-notice.error {
-    border-left-color: #dc3232;
+.button.success:hover {
+    background: #399946 !important;
+    border-color: #399946 !important;
 }

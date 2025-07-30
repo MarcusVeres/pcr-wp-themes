@@ -1,6 +1,6 @@
 /**
  * PCR Discogs API - Admin JavaScript
- * Version: 1.0.0
+ * Version: 1.0.2
  */
 
 (function($) {
@@ -35,14 +35,11 @@
             // Test API connection button
             $(document).on('click', '.pcr-test-api', this.testApiConnection);
             
+            // Download images button
+            $(document).on('click', '.pcr-download-images', this.downloadImages);
+            
             // Save settings form
             $(document).on('submit', '#pcr-settings-form', this.saveSettings);
-            
-            // Clear cache button
-            $(document).on('click', '.pcr-clear-cache', this.clearCache);
-            
-            // Import products button
-            $(document).on('click', '.pcr-import-products', this.importProducts);
         },
 
         /**
@@ -53,105 +50,159 @@
             
             const $button = $(this);
             const originalText = $button.text();
+            const $resultDiv = $('.pcr-test-result');
             
             // Show loading state
-            $button.html('<span class="pcr-loading"></span> Testing...')
+            $button.html('<span class="pcr-loading"></span> ' + pcrDiscogsAjax.strings.testing)
                    .prop('disabled', true);
             
-            // Simulate API test (replace with actual AJAX call)
-            setTimeout(function() {
-                $button.html('✅ Connection Successful!')
-                       .removeClass('pcr-button')
-                       .addClass('pcr-button success');
+            // Get API token from form
+            const apiToken = $('input[name="pcr_discogs_api_token"]').val();
+            
+            if (!apiToken) {
+                $resultDiv.html('<div class="pcr-notice error"><p>Please enter an API token first.</p></div>');
+                $button.html(originalText).prop('disabled', false);
+                return;
+            }
+            
+            // Test with a simple API call (get user identity)
+            $.ajax({
+                url: 'https://api.discogs.com/oauth/identity',
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Discogs token=' + apiToken,
+                    'User-Agent': 'PCRDiscogsAPI/1.0 +https://pcr.sarazstudio.com'
+                },
+                timeout: 10000
+            })
+            .done(function(data) {
+                $resultDiv.html('<div class="pcr-notice success"><p>' + 
+                    pcrDiscogsAjax.strings.test_success + 
+                    '<br>Connected as: <strong>' + (data.username || 'Unknown') + '</strong></p></div>');
                 
+                $button.html('✅ ' + pcrDiscogsAjax.strings.test_success)
+                       .removeClass('button')
+                       .addClass('button button-primary');
+            })
+            .fail(function(xhr) {
+                let errorMsg = pcrDiscogsAjax.strings.test_error;
+                
+                if (xhr.status === 401) {
+                    errorMsg += ' Invalid token';
+                } else if (xhr.status === 0) {
+                    errorMsg += ' Network error';
+                } else {
+                    errorMsg += ' HTTP ' + xhr.status;
+                }
+                
+                $resultDiv.html('<div class="pcr-notice error"><p>' + errorMsg + '</p></div>');
+            })
+            .always(function() {
                 // Reset after 3 seconds
                 setTimeout(function() {
                     $button.html(originalText)
-                           .removeClass('success')
-                           .addClass('pcr-button')
+                           .removeClass('button-primary')
+                           .addClass('button')
                            .prop('disabled', false);
                 }, 3000);
-            }, 2000);
+            });
+        },
+
+        /**
+         * Download images from Discogs
+         */
+        downloadImages: function(e) {
+            e.preventDefault();
+            
+            const $button = $(this);
+            const productId = $button.data('product-id');
+            const $statusDiv = $('.pcr-download-status');
+            const originalText = $button.text();
+            
+            // Show loading state
+            $button.html('<span class="pcr-loading"></span> ' + pcrDiscogsAjax.strings.downloading)
+                   .prop('disabled', true);
+            
+            $statusDiv.html('<div class="pcr-notice info"><p>' + pcrDiscogsAjax.strings.downloading + '</p></div>');
+            
+            // Make AJAX call
+            $.ajax({
+                url: pcrDiscogsAjax.ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'pcr_download_discogs_images',
+                    product_id: productId,
+                    nonce: pcrDiscogsAjax.nonce
+                },
+                timeout: 60000 // 60 seconds for image downloads
+            })
+            .done(function(response) {
+                if (response.success) {
+                    const data = response.data;
+                    const successMsg = data.message + 
+                        '<br><strong>Release:</strong> ' + data.release_title +
+                        '<br><strong>Images:</strong> ' + data.images_downloaded +
+                        (data.featured_image_set ? '<br><strong>Featured image:</strong> Set' : '');
+                    
+                    $statusDiv.html('<div class="pcr-notice success"><p>' + successMsg + '</p></div>');
+                    
+                    // Show success on button temporarily
+                    $button.html('✅ ' + pcrDiscogsAjax.strings.success);
+                    
+                    // Reload the page after 2 seconds to show new images
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    $statusDiv.html('<div class="pcr-notice error"><p>' + 
+                        pcrDiscogsAjax.strings.error + ' ' + response.data + '</p></div>');
+                }
+            })
+            .fail(function(xhr) {
+                let errorMsg = pcrDiscogsAjax.strings.error + ' ';
+                
+                if (xhr.status === 0) {
+                    errorMsg += 'Network error or timeout';
+                } else if (xhr.responseJSON && xhr.responseJSON.data) {
+                    errorMsg += xhr.responseJSON.data;
+                } else {
+                    errorMsg += 'HTTP ' + xhr.status;
+                }
+                
+                $statusDiv.html('<div class="pcr-notice error"><p>' + errorMsg + '</p></div>');
+            })
+            .always(function() {
+                // Reset button after 3 seconds if not reloading
+                setTimeout(function() {
+                    if (!$button.html().includes('✅')) {
+                        $button.html(originalText).prop('disabled', false);
+                    }
+                }, 3000);
+            });
         },
 
         /**
          * Save settings
          */
         saveSettings: function(e) {
-            e.preventDefault();
-            
             const $form = $(this);
-            const formData = $form.serialize();
-            
-            // Show saving indicator
             const $submitButton = $form.find('input[type="submit"]');
             const originalValue = $submitButton.val();
             
-            $submitButton.val('Saving...')
-                        .prop('disabled', true);
+            $submitButton.val('Saving...').prop('disabled', true);
             
-            // Simulate save (replace with actual AJAX)
+            // Let the form submit normally, but show feedback
             setTimeout(function() {
-                PCRDiscogsAdmin.showNotice('Settings saved successfully!', 'success');
-                
-                $submitButton.val(originalValue)
-                            .prop('disabled', false);
+                $submitButton.val(originalValue).prop('disabled', false);
             }, 1500);
-        },
-
-        /**
-         * Clear cache
-         */
-        clearCache: function(e) {
-            e.preventDefault();
-            
-            if (!confirm('Are you sure you want to clear the Discogs API cache?')) {
-                return;
-            }
-            
-            const $button = $(this);
-            $button.html('<span class="pcr-loading"></span> Clearing...')
-                   .prop('disabled', true);
-            
-            // Simulate cache clear
-            setTimeout(function() {
-                PCRDiscogsAdmin.showNotice('Cache cleared successfully!', 'success');
-                $button.html('Clear Cache')
-                       .prop('disabled', false);
-            }, 1000);
-        },
-
-        /**
-         * Import products from Discogs
-         */
-        importProducts: function(e) {
-            e.preventDefault();
-            
-            const $button = $(this);
-            $button.html('<span class="pcr-loading"></span> Importing...')
-                   .prop('disabled', true);
-            
-            // Simulate import process
-            setTimeout(function() {
-                PCRDiscogsAdmin.showNotice('Product import completed! 25 products imported.', 'success');
-                $button.html('Import Products')
-                       .prop('disabled', false);
-            }, 3000);
         },
 
         /**
          * Check API status
          */
         checkApiStatus: function() {
-            // Add status indicator to the page
-            const statusHtml = `
-                <div class="pcr-api-status">
-                    <span class="pcr-status-indicator active"></span>
-                    <strong>API Status:</strong> Connected
-                </div>
-            `;
-            
-            $('.pcr-discogs-admin .card:first').prepend(statusHtml);
+            // The status is already shown in PHP, just add some styling
+            $('.pcr-api-status').show();
         },
 
         /**
@@ -185,41 +236,6 @@
                     $(this).remove();
                 });
             }, 5000);
-        },
-
-        /**
-         * Format file size
-         */
-        formatFileSize: function(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        },
-
-        /**
-         * Debounce function for search inputs
-         */
-        debounce: function(func, wait, immediate) {
-            let timeout;
-            return function executedFunction() {
-                const context = this;
-                const args = arguments;
-                
-                const later = function() {
-                    timeout = null;
-                    if (!immediate) func.apply(context, args);
-                };
-                
-                const callNow = immediate && !timeout;
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-                
-                if (callNow) func.apply(context, args);
-            };
         }
     };
 
