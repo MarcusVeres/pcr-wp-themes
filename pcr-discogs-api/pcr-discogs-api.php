@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.3');
+define('PCR_DISCOGS_API_VERSION', '1.0.4');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -225,7 +225,7 @@ class PCR_Discogs_API {
      * Discogs images meta box callback
      */
     public function discogs_images_meta_box($post) {
-        $discogs_id = get_field('discogs_id', $post->ID);
+        $discogs_release_id = get_field('discogs_release_id', $post->ID);
         $api_token = get_option('pcr_discogs_api_token', '');
         
         wp_nonce_field('pcr_download_images', 'pcr_download_images_nonce');
@@ -239,12 +239,12 @@ class PCR_Discogs_API {
                     </a>
                 </p>
             <?php else: ?>
-                <?php if (empty($discogs_id)): ?>
+                <?php if (empty($discogs_release_id)): ?>
                     <p class="pcr-notice warning">
                         <?php _e('⚠️ No Discogs ID found. Please enter a Discogs Release ID in the custom field below.', 'pcr-discogs-api'); ?>
                     </p>
                 <?php else: ?>
-                    <p><strong><?php _e('Discogs Release ID:', 'pcr-discogs-api'); ?></strong> <?php echo esc_html($discogs_id); ?></p>
+                    <p><strong><?php _e('Discogs Release ID:', 'pcr-discogs-api'); ?></strong> <?php echo esc_html($discogs_release_id); ?></p>
                     <button type="button" class="button button-primary pcr-download-images" data-product-id="<?php echo $post->ID; ?>">
                         <?php _e('Download Images from Discogs', 'pcr-discogs-api'); ?>
                     </button>
@@ -291,10 +291,10 @@ class PCR_Discogs_API {
         }
         
         $product_id = intval($_POST['product_id']);
-        $discogs_id = get_field('discogs_id', $product_id);
+        $discogs_release_id = get_field('discogs_release_id', $product_id);
         $api_token = get_option('pcr_discogs_api_token', '');
         
-        if (empty($discogs_id)) {
+        if (empty($discogs_release_id)) {
             wp_send_json_error(__('No Discogs ID found for this product', 'pcr-discogs-api'));
         }
         
@@ -303,7 +303,7 @@ class PCR_Discogs_API {
         }
         
         // Call Discogs API
-        $discogs_data = $this->get_discogs_release($discogs_id, $api_token);
+        $discogs_data = $this->get_discogs_release($discogs_release_id, $api_token);
         
         if (is_wp_error($discogs_data)) {
             wp_send_json_error($discogs_data->get_error_message());
