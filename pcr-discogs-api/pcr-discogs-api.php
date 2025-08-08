@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.4
+ * Version: 1.0.6
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.4');
+define('PCR_DISCOGS_API_VERSION', '1.0.6');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -248,6 +248,10 @@ class PCR_Discogs_API {
                     <button type="button" class="button button-primary pcr-download-images" data-product-id="<?php echo $post->ID; ?>">
                         <?php _e('Download Images from Discogs', 'pcr-discogs-api'); ?>
                     </button>
+                    <label style="margin-top: 10px; display: block;">
+                        <input type="checkbox" id="pcr-force-overwrite" style="margin-right: 5px;" />
+                        <?php _e('Force overwrite existing images', 'pcr-discogs-api'); ?>
+                    </label>
                 <?php endif; ?>
                 
                 <div class="pcr-download-status" style="margin-top: 15px;"></div>
@@ -309,9 +313,17 @@ class PCR_Discogs_API {
             wp_send_json_error($discogs_data->get_error_message());
         }
         
-        // Download and attach images
-        $result = $this->download_and_attach_images($product_id, $discogs_data);
+        // ------------------------------------------------------
+        // OVERWRITE IF SAME IMAGES 
+
+        // OLD CODE (find and replace this):
+        // $result = $this->download_and_attach_images($product_id, $discogs_data);
+
+        // NEW CODE (replace with this):
+        $result = $this->smart_download_and_attach_images($product_id, $discogs_data, false);
         
+        // ------------------------------------------------------
+
         if (is_wp_error($result)) {
             wp_send_json_error($result->get_error_message());
         }
@@ -360,54 +372,7 @@ class PCR_Discogs_API {
         
         return $data;
     }
-    
-    /**
-     * Download and attach images to product
-     */
-    private function download_and_attach_images($product_id, $discogs_data) {
-        if (empty($discogs_data['images'])) {
-            return new WP_Error('no_images', __('No images found for this release', 'pcr-discogs-api'));
-        }
         
-        $downloaded_images = array();
-        $featured_image_set = false;
-        
-        foreach ($discogs_data['images'] as $index => $image) {
-            if (empty($image['uri'])) {
-                continue;
-            }
-            
-            // Download the image
-            $attachment_id = $this->download_image_to_media_library($image['uri'], $product_id, $index);
-            
-            if (is_wp_error($attachment_id)) {
-                continue; // Skip this image and try the next one
-            }
-            
-            $downloaded_images[] = $attachment_id;
-            
-            // Set first image as featured image
-            if (!$featured_image_set) {
-                set_post_thumbnail($product_id, $attachment_id);
-                $featured_image_set = true;
-            }
-        }
-        
-        if (empty($downloaded_images)) {
-            return new WP_Error('download_failed', __('Failed to download any images', 'pcr-discogs-api'));
-        }
-        
-        // Add images to product gallery
-        $this->add_images_to_product_gallery($product_id, $downloaded_images);
-        
-        return array(
-            'message' => sprintf(__('Successfully downloaded %d images', 'pcr-discogs-api'), count($downloaded_images)),
-            'images_downloaded' => count($downloaded_images),
-            'featured_image_set' => $featured_image_set,
-            'release_title' => $discogs_data['title'] ?? __('Unknown Release', 'pcr-discogs-api')
-        );
-    }
-    
     /**
      * Download image to WordPress media library
      */
@@ -433,21 +398,6 @@ class PCR_Discogs_API {
         update_post_meta($attachment_id, '_wp_attachment_image_alt', $product_title . ' - Image ' . ($index + 1));
         
         return $attachment_id;
-    }
-    
-    /**
-     * Add images to product gallery
-     */
-    private function add_images_to_product_gallery($product_id, $new_image_ids) {
-        // Get existing gallery images
-        $existing_gallery = get_post_meta($product_id, '_product_image_gallery', true);
-        $existing_ids = !empty($existing_gallery) ? explode(',', $existing_gallery) : array();
-        
-        // Merge with new images (avoid duplicates)
-        $all_ids = array_unique(array_merge($existing_ids, $new_image_ids));
-        
-        // Update gallery
-        update_post_meta($product_id, '_product_image_gallery', implode(',', $all_ids));
     }
     
     /**
@@ -502,6 +452,141 @@ class PCR_Discogs_API {
             PCR_DISCOGS_API_VERSION
         );
     }
+
+    // --------------------------------------------------------------------------
+    // 2025-08-08
+
+    /**
+     * Smart image download with existing image handling
+     * Add this method inside your PCR_Discogs_API class
+     */
+    public function smart_download_and_attach_images($product_id, $discogs_data, $force_overwrite = false) {
+        if (empty($discogs_data['images'])) {
+            return new WP_Error('no_images', __('No images found for this release', 'pcr-discogs-api'));
+        }
+        
+        // Get existing images and check their source
+        $existing_images = $this->categorize_existing_images($product_id);
+        
+        error_log("PCR DEBUG: Found " . count($existing_images['user_uploaded']) . " user images, " . count($existing_images['discogs_downloaded']) . " discogs images");
+        
+        // If force_overwrite is false and user images exist, skip
+        if (!$force_overwrite && !empty($existing_images['user_uploaded'])) {
+            return new WP_Error('user_images_exist', __('User-uploaded images exist. Check "Force Overwrite" to replace.', 'pcr-discogs-api'));
+        }
+        
+        // Clean up old Discogs images only
+        $this->cleanup_discogs_images($existing_images['discogs_downloaded']);
+        
+        // Download new images using your existing method
+        $downloaded_images = array();
+        $featured_image_set = false;
+        
+        foreach ($discogs_data['images'] as $index => $image) {
+            if (empty($image['uri'])) {
+                continue;
+            }
+            
+            // Use your existing download method
+            $attachment_id = $this->download_image_to_media_library($image['uri'], $product_id, $index);
+            
+            if (is_wp_error($attachment_id)) {
+                continue; 
+            }
+            
+            // Mark as Discogs-downloaded for future identification
+            update_post_meta($attachment_id, '_pcr_image_source', 'discogs');
+            update_post_meta($attachment_id, '_pcr_discogs_release_id', $discogs_data['id']);
+            update_post_meta($attachment_id, '_pcr_download_date', current_time('mysql'));
+            
+            $downloaded_images[] = $attachment_id;
+            
+            // Set first image as featured if no user thumbnail exists
+            if (!$featured_image_set && empty($existing_images['user_thumbnail'])) {
+                set_post_thumbnail($product_id, $attachment_id);
+                $featured_image_set = true;
+            }
+        }
+        
+        if (empty($downloaded_images)) {
+            return new WP_Error('download_failed', __('Failed to download any images', 'pcr-discogs-api'));
+        }
+        
+        // Combine preserved user images with new Discogs images
+        $final_gallery = array_merge($existing_images['user_uploaded'], $downloaded_images);
+        $this->add_images_to_product_gallery($product_id, $final_gallery);
+        
+        return array(
+            'message' => sprintf(__('Successfully downloaded %d new images. Preserved %d user images.', 'pcr-discogs-api'), 
+                count($downloaded_images), count($existing_images['user_uploaded'])),
+            'images_downloaded' => count($downloaded_images),
+            'user_images_preserved' => count($existing_images['user_uploaded']),
+            'featured_image_set' => $featured_image_set
+        );
+    }
+    
+    /**
+     * Categorize existing images by source
+     */
+    private function categorize_existing_images($product_id) {
+        $existing_gallery = get_post_meta($product_id, '_product_image_gallery', true);
+        $existing_ids = !empty($existing_gallery) ? explode(',', $existing_gallery) : array();
+        $thumbnail_id = get_post_thumbnail_id($product_id);
+        
+        if ($thumbnail_id && !in_array($thumbnail_id, $existing_ids)) {
+            $existing_ids[] = $thumbnail_id;
+        }
+        
+        $categorized = array(
+            'user_uploaded' => array(),
+            'discogs_downloaded' => array(),
+            'user_thumbnail' => null
+        );
+        
+        foreach ($existing_ids as $attachment_id) {
+            if (empty($attachment_id)) continue;
+            
+            $source = get_post_meta($attachment_id, '_pcr_image_source', true);
+            
+            if ($source === 'discogs') {
+                $categorized['discogs_downloaded'][] = $attachment_id;
+            } else {
+                // Assume it's user uploaded if not marked as discogs
+                $categorized['user_uploaded'][] = $attachment_id;
+                
+                // Check if this user image is the current thumbnail
+                if ($attachment_id == $thumbnail_id) {
+                    $categorized['user_thumbnail'] = $attachment_id;
+                }
+            }
+        }
+        
+        return $categorized;
+    }
+    
+    /**
+     * Clean up old Discogs images
+     */
+    private function cleanup_discogs_images($discogs_image_ids) {
+        foreach ($discogs_image_ids as $attachment_id) {
+            error_log("PCR DEBUG: Deleting old Discogs image {$attachment_id}");
+            wp_delete_attachment($attachment_id, true);
+        }
+    }
+    
+    /**
+     * Updated gallery management to handle existing images properly
+     */
+    private function add_images_to_product_gallery($product_id, $all_image_ids) {
+        // Remove empty values and duplicates
+        $all_image_ids = array_filter(array_unique($all_image_ids));
+        
+        // Update gallery with the combined list
+        update_post_meta($product_id, '_product_image_gallery', implode(',', $all_image_ids));
+        
+        error_log("PCR DEBUG: Updated gallery for product {$product_id} with images: " . implode(',', $all_image_ids));
+    }
+
 }
 
 // Initialize the plugin
