@@ -20,6 +20,31 @@ function pcr_woocommerce_support() {
 add_action('after_setup_theme', 'pcr_woocommerce_support');
 
 // --------------------------------------------------------------
+// BUG FIX 
+
+/*
+This filter specifically targets the WooCommerce gallery thumbnails and removes the featured image from appearing in the thumbnail gallery if it matches the product's featured image ID php - Remove featured image from the WooCommerce gallery - Stack Overflow.
+The issue occurs because WooCommerce automatically includes the featured image in the gallery thumbnails, and if that same image is also manually added to the product gallery, it displays twice Product Gallery Slider, Additional Variation Images for WooCommerce – WordPress plugin | WordPress.org.
+*/
+
+add_filter('woocommerce_product_get_gallery_image_ids', 'remove_featured_from_gallery', 10, 1);
+function remove_featured_from_gallery($gallery_ids) {
+    global $product;
+    
+    if (!$product) return $gallery_ids;
+    
+    $featured_image_id = $product->get_image_id();
+    
+    // Remove featured image from gallery if it exists there
+    if ($featured_image_id && in_array($featured_image_id, $gallery_ids)) {
+        $gallery_ids = array_diff($gallery_ids, array($featured_image_id));
+    }
+    
+    return $gallery_ids;
+}
+
+
+// --------------------------------------------------------------
 // ARTIST STUFF
 
 /**
