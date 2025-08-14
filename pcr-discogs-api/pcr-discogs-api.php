@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.7
+ * Version: 1.0.8
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.7');
+define('PCR_DISCOGS_API_VERSION', '1.0.8');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -651,7 +651,8 @@ class PCR_Discogs_API {
     }
 
     /**
-     * NEW: Extract record data from Discogs API response and update ACF fields
+     * Updated extract_and_update_record_data method with debugging
+     * Replace the existing method in your PCR_Discogs_API class with this version
      */
     private function extract_and_update_record_data($product_id, $discogs_data) {
         $updated_fields = array();
@@ -677,14 +678,33 @@ class PCR_Discogs_API {
             $errors[] = 'Country not found in Discogs data';
         }
         
-        // Extract Genres (comma-separated)
+        // Extract Genres (comma-separated) - WITH DEBUGGING
         if (isset($discogs_data['genres']) && is_array($discogs_data['genres']) && !empty($discogs_data['genres'])) {
             $genres_array = array_map('sanitize_text_field', $discogs_data['genres']);
             $genres_string = implode(', ', $genres_array);
+            
+            // DEBUG: Log what we're working with
+            error_log("PCR DEBUG - Product ID: {$product_id}");
+            error_log("PCR DEBUG - Raw genres from Discogs: " . print_r($discogs_data['genres'], true));
+            error_log("PCR DEBUG - Sanitized genres array: " . print_r($genres_array, true));
+            error_log("PCR DEBUG - Final genres string: " . $genres_string);
+            error_log("PCR DEBUG - Genre count: " . count($genres_array));
+            
             update_field('genres', $genres_string, $product_id);
-            $updated_fields[] = 'Genres: ' . $genres_string;
+            $updated_fields[] = 'Genres (' . count($genres_array) . '): ' . $genres_string;
         } else {
+            // DEBUG: Log when no genres found
+            if (isset($discogs_data['genres'])) {
+                error_log("PCR DEBUG - Genres field exists but: " . print_r($discogs_data['genres'], true));
+            } else {
+                error_log("PCR DEBUG - No genres field in Discogs response");
+            }
             $errors[] = 'Genres not found in Discogs data';
+        }
+        
+        // Also check for 'styles' field which might contain additional genre info
+        if (isset($discogs_data['styles']) && is_array($discogs_data['styles']) && !empty($discogs_data['styles'])) {
+            error_log("PCR DEBUG - Styles from Discogs: " . print_r($discogs_data['styles'], true));
         }
         
         // Prepare response
