@@ -1,3 +1,7 @@
+/**
+ * PCR Discogs API - Admin JavaScript (UPDATED)
+ */
+
 (function($) {
     'use strict';
 
@@ -24,7 +28,7 @@
         },
 
         /**
-         * Bind event handlers (UPDATED - add new button handler)
+         * Bind event handlers (UPDATED - add categories button handler)
          */
         bindEvents: function() {
             // Test API connection button
@@ -33,8 +37,11 @@
             // Download images button (existing)
             $(document).on('click', '.pcr-download-images', this.downloadImages);
             
-            // NEW: Download record data button
+            // Download record data button
             $(document).on('click', '.pcr-download-record-data', this.downloadRecordData);
+            
+            // NEW: Set categories button
+            $(document).on('click', '.pcr-set-categories', this.setCategoriesFromDiscogs);
             
             // Save settings form
             $(document).on('submit', '#pcr-settings-form', this.saveSettings);
@@ -241,6 +248,96 @@
             })
             .fail(function(xhr) {
                 let errorMsg = 'Error downloading record data: ';
+                
+                if (xhr.status === 0) {
+                    errorMsg += 'Network error or timeout';
+                } else if (xhr.responseJSON && xhr.responseJSON.data) {
+                    errorMsg += xhr.responseJSON.data;
+                } else {
+                    errorMsg += 'HTTP ' + xhr.status;
+                }
+                
+                $statusDiv.html('<div class="pcr-notice error"><p>' + errorMsg + '</p></div>');
+            })
+            .always(function() {
+                // Reset button after 5 seconds if not reloading
+                setTimeout(function() {
+                    if (!$button.html().includes('✅')) {
+                        $button.html(originalText).prop('disabled', false);
+                    }
+                }, 5000);
+            });
+        },
+
+        /**
+         * NEW: Set categories from Discogs data
+         */
+        setCategoriesFromDiscogs: function(e) {
+            e.preventDefault();
+            
+            const $button = $(this);
+            const productId = $button.data('product-id');
+            const $statusDiv = $('.pcr-categories-status');
+            const originalText = $button.text();
+            
+            // Show loading state
+            $button.html('<span class="pcr-loading"></span> Setting categories...')
+                   .prop('disabled', true);
+            
+            $statusDiv.html('<div class="pcr-notice info"><p>Creating categories from Discogs genres...</p></div>');
+            
+            // Make AJAX call
+            $.ajax({
+                url: pcrDiscogsAjax.ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'pcr_set_categories_from_discogs',
+                    product_id: productId,
+                    nonce: pcrDiscogsAjax.nonce
+                },
+                timeout: 30000 // 30 seconds for category processing
+            })
+            .done(function(response) {
+                if (response.success) {
+                    const data = response.data;
+                    let successMsg = data.message;
+                    
+                    if (data.created_categories && data.created_categories.length > 0) {
+                        successMsg += '<br><strong>Created categories:</strong><br>';
+                        data.created_categories.forEach(function(category) {
+                            successMsg += '• ' + category + '<br>';
+                        });
+                    }
+                    
+                    if (data.assigned_categories && data.assigned_categories.length > 0) {
+                        successMsg += '<br><strong>Assigned categories:</strong><br>';
+                        data.assigned_categories.forEach(function(category) {
+                            successMsg += '• ' + category + '<br>';
+                        });
+                    }
+                    
+                    if (data.errors && data.errors.length > 0) {
+                        successMsg += '<br><strong>Warnings:</strong><br>';
+                        data.errors.forEach(function(error) {
+                            successMsg += '• ' + error + '<br>';
+                        });
+                    }
+                    
+                    $statusDiv.html('<div class="pcr-notice success"><p>' + successMsg + '</p></div>');
+                    
+                    // Show success on button temporarily
+                    $button.html('✅ Categories Set');
+                    
+                    // Reload the page after 3 seconds to show updated categories
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                } else {
+                    $statusDiv.html('<div class="pcr-notice error"><p>Error setting categories: ' + response.data + '</p></div>');
+                }
+            })
+            .fail(function(xhr) {
+                let errorMsg = 'Error setting categories: ';
                 
                 if (xhr.status === 0) {
                     errorMsg += 'Network error or timeout';

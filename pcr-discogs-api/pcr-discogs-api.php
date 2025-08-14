@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.8
+ * Version: 1.0.9
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.8');
+define('PCR_DISCOGS_API_VERSION', '1.0.9');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -42,7 +42,7 @@ class PCR_Discogs_API {
     }
     
     /**
-     * Initialize the plugin (UPDATED - add new AJAX handler)
+     * Initialize the plugin (UPDATED - add categories AJAX handler)
      */
     public function init() {
         // Load text domain for translations
@@ -55,16 +55,18 @@ class PCR_Discogs_API {
             add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
             add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
             
-            // Existing AJAX handler
+            // Existing AJAX handlers
             add_action('wp_ajax_pcr_download_discogs_images', array($this, 'ajax_download_discogs_images'));
-            
-            // NEW: Add record data AJAX handler
             add_action('wp_ajax_pcr_download_record_data', array($this, 'ajax_download_record_data'));
+            
+            // NEW: Add categories AJAX handler
+            add_action('wp_ajax_pcr_set_categories_from_discogs', array($this, 'ajax_set_categories_from_discogs'));
         }
         
         // Initialize frontend functionality
         add_action('wp_enqueue_scripts', array($this, 'frontend_enqueue_scripts'));
     }
+
     
     /**
      * Plugin activation
@@ -227,11 +229,12 @@ class PCR_Discogs_API {
     }
     
     /**
-     * Discogs images meta box callback (UPDATED - add second button)
+     * Discogs images meta box callback (UPDATED - add third button)
      */
     public function discogs_images_meta_box($post) {
         $discogs_release_id = get_field('discogs_release_id', $post->ID);
         $api_token = get_option('pcr_discogs_api_token', '');
+        $genres_text = get_field('genres', $post->ID);
         
         wp_nonce_field('pcr_download_images', 'pcr_download_images_nonce');
         ?>
@@ -260,7 +263,7 @@ class PCR_Discogs_API {
                         <?php _e('Force overwrite existing images', 'pcr-discogs-api'); ?>
                     </label>
                     
-                    <!-- NEW: Record Data Button -->
+                    <!-- EXISTING Record Data Button -->
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
                         <button type="button" class="button button-secondary pcr-download-record-data" data-product-id="<?php echo $post->ID; ?>">
                             <?php _e('Download Record Data', 'pcr-discogs-api'); ?>
@@ -268,10 +271,26 @@ class PCR_Discogs_API {
                         <p class="description"><?php _e('Downloads year, country, and genres from Discogs', 'pcr-discogs-api'); ?></p>
                     </div>
                     
+                    <!-- NEW: Categories Button -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                        <?php if (!empty($genres_text)): ?>
+                            <p><strong><?php _e('Current Genres:', 'pcr-discogs-api'); ?></strong> <?php echo esc_html($genres_text); ?></p>
+                            <button type="button" class="button button-secondary pcr-set-categories" data-product-id="<?php echo $post->ID; ?>">
+                                <?php _e('Set Categories from Discogs Data', 'pcr-discogs-api'); ?>
+                            </button>
+                            <p class="description"><?php _e('Creates categories and assigns them to this product', 'pcr-discogs-api'); ?></p>
+                        <?php else: ?>
+                            <p class="pcr-notice warning">
+                                <?php _e('⚠️ No genres data found. Please download record data first.', 'pcr-discogs-api'); ?>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                    
                 <?php endif; ?>
                 
                 <div class="pcr-download-status" style="margin-top: 15px;"></div>
                 <div class="pcr-record-data-status" style="margin-top: 15px;"></div>
+                <div class="pcr-categories-status" style="margin-top: 15px;"></div>
             <?php endif; ?>
         </div>
         
@@ -472,11 +491,11 @@ class PCR_Discogs_API {
 
     // --------------------------------------------------------------------------
     // 2025-08-08
-
+    
     /**
      * Smart image download with existing image handling
      * Add this method inside your PCR_Discogs_API class
-     */
+    */
     public function smart_download_and_attach_images($product_id, $discogs_data, $force_overwrite = false) {
         if (empty($discogs_data['images'])) {
             return new WP_Error('no_images', __('No images found for this release', 'pcr-discogs-api'));
@@ -535,7 +554,7 @@ class PCR_Discogs_API {
         
         return array(
             'message' => sprintf(__('Successfully downloaded %d new images. Preserved %d user images.', 'pcr-discogs-api'), 
-                count($downloaded_images), count($existing_images['user_uploaded'])),
+            count($downloaded_images), count($existing_images['user_uploaded'])),
             'images_downloaded' => count($downloaded_images),
             'user_images_preserved' => count($existing_images['user_uploaded']),
             'featured_image_set' => $featured_image_set
@@ -544,7 +563,7 @@ class PCR_Discogs_API {
     
     /**
      * Categorize existing images by source
-     */
+    */
     private function categorize_existing_images($product_id) {
         $existing_gallery = get_post_meta($product_id, '_product_image_gallery', true);
         $existing_ids = !empty($existing_gallery) ? explode(',', $existing_gallery) : array();
@@ -583,7 +602,7 @@ class PCR_Discogs_API {
     
     /**
      * Clean up old Discogs images
-     */
+    */
     private function cleanup_discogs_images($discogs_image_ids) {
         foreach ($discogs_image_ids as $attachment_id) {
             error_log("PCR DEBUG: Deleting old Discogs image {$attachment_id}");
@@ -593,7 +612,7 @@ class PCR_Discogs_API {
     
     /**
      * Updated gallery management to handle existing images properly
-     */
+    */
     private function add_images_to_product_gallery($product_id, $all_image_ids) {
         // Remove empty values and duplicates
         $all_image_ids = array_filter(array_unique($all_image_ids));
@@ -603,13 +622,13 @@ class PCR_Discogs_API {
         
         error_log("PCR DEBUG: Updated gallery for product {$product_id} with images: " . implode(',', $all_image_ids));
     }
-
+    
     // -------------------------------------------
     // 2025-08-14
-
+    
     /**
      * NEW: AJAX handler for downloading Discogs record data
-     */
+    */
     public function ajax_download_record_data() {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'pcr_download_images')) {
@@ -649,11 +668,11 @@ class PCR_Discogs_API {
         
         wp_send_json_success($result);
     }
-
+    
     /**
      * Updated extract_and_update_record_data method with debugging
      * Replace the existing method in your PCR_Discogs_API class with this version
-     */
+    */
     private function extract_and_update_record_data($product_id, $discogs_data) {
         $updated_fields = array();
         $errors = array();
@@ -722,6 +741,120 @@ class PCR_Discogs_API {
         return $response;
     }
 
+    // --------------------------------------------------------------------------
+    // 2025-08-08 // CATEGORIES 
+
+    /**
+     * NEW: AJAX handler for setting categories from Discogs data
+     */
+    public function ajax_set_categories_from_discogs() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'pcr_download_images')) {
+            wp_die(__('Security check failed', 'pcr-discogs-api'));
+        }
+        
+        // Check user permissions
+        if (!current_user_can('edit_products') || !current_user_can('manage_product_terms')) {
+            wp_die(__('Insufficient permissions', 'pcr-discogs-api'));
+        }
+        
+        $product_id = intval($_POST['product_id']);
+        $genres_text = get_field('genres', $product_id);
+        
+        if (empty($genres_text)) {
+            wp_send_json_error(__('No genres data found for this product', 'pcr-discogs-api'));
+        }
+        
+        // Process genres and set categories
+        $result = $this->process_genres_to_categories($product_id, $genres_text);
+        
+        if (is_wp_error($result)) {
+            wp_send_json_error($result->get_error_message());
+        }
+        
+        wp_send_json_success($result);
+    }
+
+    /**
+     * NEW: Process genres text and create/assign categories
+     */
+    private function process_genres_to_categories($product_id, $genres_text) {
+        $created_categories = array();
+        $assigned_categories = array();
+        $errors = array();
+        $category_ids = array();
+        
+        // Parse comma-separated genres
+        $genres_array = array_map('trim', explode(',', $genres_text));
+        $genres_array = array_filter($genres_array); // Remove empty values
+        
+        error_log("PCR DEBUG - Processing genres for product {$product_id}: " . print_r($genres_array, true));
+        
+        foreach ($genres_array as $genre_name) {
+            if (empty($genre_name)) {
+                continue;
+            }
+            
+            // Check if category exists
+            $existing_term = get_term_by('name', $genre_name, 'product_cat');
+            
+            if ($existing_term) {
+                // Category exists, just add to assignment list
+                $category_ids[] = $existing_term->term_id;
+                $assigned_categories[] = $genre_name;
+                error_log("PCR DEBUG - Found existing category: {$genre_name} (ID: {$existing_term->term_id})");
+            } else {
+                // Create new category
+                $new_term = wp_insert_term(
+                    $genre_name,           // Term name
+                    'product_cat',         // Taxonomy
+                    array(
+                        'description' => 'Auto-created from Discogs genre data',
+                        'slug' => sanitize_title($genre_name)
+                    )
+                );
+                
+                if (is_wp_error($new_term)) {
+                    $errors[] = "Failed to create category '{$genre_name}': " . $new_term->get_error_message();
+                    error_log("PCR DEBUG - Failed to create category {$genre_name}: " . $new_term->get_error_message());
+                } else {
+                    $category_ids[] = $new_term['term_id'];
+                    $created_categories[] = $genre_name;
+                    $assigned_categories[] = $genre_name;
+                    error_log("PCR DEBUG - Created new category: {$genre_name} (ID: {$new_term['term_id']})");
+                }
+            }
+        }
+        
+        // Assign categories to product
+        if (!empty($category_ids)) {
+            $assignment_result = wp_set_post_terms($product_id, $category_ids, 'product_cat', false);
+            
+            if (is_wp_error($assignment_result)) {
+                $errors[] = "Failed to assign categories to product: " . $assignment_result->get_error_message();
+                error_log("PCR DEBUG - Failed to assign categories: " . $assignment_result->get_error_message());
+            } else {
+                error_log("PCR DEBUG - Successfully assigned categories to product {$product_id}: " . implode(', ', $category_ids));
+            }
+        }
+        
+        // Prepare response
+        if (empty($assigned_categories) && empty($created_categories)) {
+            return new WP_Error('no_categories', __('No categories could be processed', 'pcr-discogs-api'));
+        }
+        
+        $response = array(
+            'message' => sprintf(__('Successfully processed %d genre(s)', 'pcr-discogs-api'), count($assigned_categories)),
+            'created_categories' => $created_categories,
+            'assigned_categories' => $assigned_categories,
+            'total_assigned' => count($assigned_categories),
+            'total_created' => count($created_categories),
+            'errors' => $errors
+        );
+        
+        return $response;
+    }
+    
 }
 
 // Initialize the plugin

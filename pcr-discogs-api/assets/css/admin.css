@@ -277,6 +277,20 @@
     color: #fff;
 }
 
+/* Categories button styling */
+.pcr-set-categories {
+    width: 100%;
+    padding: 8px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.pcr-set-categories:hover {
+    background: #555;
+    color: #fff;
+}
+
 /* Separate status areas */
 .pcr-record-data-status {
     margin-top: 15px;
@@ -284,31 +298,42 @@
     padding-top: 10px;
 }
 
-.pcr-record-data-status .pcr-notice {
+.pcr-categories-status {
+    margin-top: 15px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 10px;
+}
+
+.pcr-record-data-status .pcr-notice,
+.pcr-categories-status .pcr-notice {
     margin: 10px 0;
 }
 
 /* Visual separation between sections */
-.pcr-discogs-meta-box .pcr-record-data-section {
+.pcr-discogs-meta-box .pcr-record-data-section,
+.pcr-discogs-meta-box .pcr-categories-section {
     margin-top: 15px;
     padding-top: 15px;
     border-top: 1px solid #ddd;
 }
 
-/* Success state for record data button */
-.pcr-download-record-data.success {
+/* Success state for buttons */
+.pcr-download-record-data.success,
+.pcr-set-categories.success {
     background: #46b450 !important;
     border-color: #46b450 !important;
     color: #fff !important;
 }
 
-.pcr-download-record-data.success:hover {
+.pcr-download-record-data.success:hover,
+.pcr-set-categories.success:hover {
     background: #399946 !important;
     border-color: #399946 !important;
 }
 
 /* Loading state improvements */
-.pcr-download-record-data .pcr-loading {
+.pcr-download-record-data .pcr-loading,
+.pcr-set-categories .pcr-loading {
     display: inline-block;
     width: 16px;
     height: 16px;
@@ -320,22 +345,33 @@
     vertical-align: middle;
 }
 
-/* Enhanced notice styling for record data */
-.pcr-record-data-status .pcr-notice.success ul {
+/* Enhanced notice styling for record data and categories */
+.pcr-record-data-status .pcr-notice.success ul,
+.pcr-categories-status .pcr-notice.success ul {
     margin: 5px 0;
     padding-left: 20px;
 }
 
-.pcr-record-data-status .pcr-notice.success li {
+.pcr-record-data-status .pcr-notice.success li,
+.pcr-categories-status .pcr-notice.success li {
     margin: 2px 0;
     font-size: 13px;
 }
 
+/* Current genres display styling */
+.pcr-discogs-meta-box .pcr-current-genres {
+    background: #f9f9f9;
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 13px;
+    margin: 8px 0;
+}
+
 /* Responsive adjustments */
 @media (max-width: 782px) {
-    .pcr-download-record-data {
+    .pcr-download-record-data,
+    .pcr-set-categories {
         font-size: 12px;
         padding: 6px 12px;
     }
 }
-
