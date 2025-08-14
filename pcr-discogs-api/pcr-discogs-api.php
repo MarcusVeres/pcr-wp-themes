@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.9
+ * Version: 1.0.10
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.9');
+define('PCR_DISCOGS_API_VERSION', '1.0.10');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -39,8 +39,21 @@ class PCR_Discogs_API {
         add_action('init', array($this, 'init'));
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+        
+        // Initialize batch processor
+        add_action('init', array($this, 'init_batch_processor'));
     }
-    
+
+    /**
+     * Initialize batch processor
+     */
+    public function init_batch_processor() {
+        if (is_admin()) {
+            require_once(PCR_DISCOGS_API_PLUGIN_DIR . 'includes/class-pcr-batch-processor.php');
+            $this->batch_processor = new PCR_Discogs_Batch_Processor($this);
+        }
+    }
+
     /**
      * Initialize the plugin (UPDATED - add categories AJAX handler)
      */
@@ -66,8 +79,8 @@ class PCR_Discogs_API {
         // Initialize frontend functionality
         add_action('wp_enqueue_scripts', array($this, 'frontend_enqueue_scripts'));
     }
-
     
+
     /**
      * Plugin activation
      */
@@ -117,6 +130,7 @@ class PCR_Discogs_API {
         );
     }
     
+
     /**
      * Admin page callback
      */
@@ -370,7 +384,7 @@ class PCR_Discogs_API {
     /**
      * Get release data from Discogs API
      */
-    private function get_discogs_release($release_id, $api_token) {
+    public function get_discogs_release($release_id, $api_token) {
         $url = "https://api.discogs.com/releases/{$release_id}";
         
         $args = array(
@@ -437,7 +451,7 @@ class PCR_Discogs_API {
     }
     
     /**
-     * Enqueue admin scripts and styles
+     * Updated admin_enqueue_scripts method
      */
     public function admin_enqueue_scripts($hook) {
         global $post_type;
@@ -461,7 +475,29 @@ class PCR_Discogs_API {
                 true
             );
             
-            // Localize script for AJAX
+            // NEW: Enqueue batch processing JS on batch page
+            if (strpos($hook, 'pcr-discogs-batch') !== false) {
+                wp_enqueue_script(
+                    'pcr-discogs-api-batch',
+                    PCR_DISCOGS_API_PLUGIN_URL . 'assets/js/batch.js',
+                    array('jquery'),
+                    PCR_DISCOGS_API_VERSION,
+                    true
+                );
+                
+                // Localize batch script
+                wp_localize_script('pcr-discogs-api-batch', 'pcrBatchAjax', array(
+                    'ajaxurl' => admin_url('admin-ajax.php'),
+                    'nonce' => wp_create_nonce('pcr_batch_processing'),
+                    'strings' => array(
+                        'scanning' => __('Scanning...', 'pcr-discogs-api'),
+                        'processing' => __('Processing...', 'pcr-discogs-api'),
+                        'complete' => __('Complete!', 'pcr-discogs-api')
+                    )
+                ));
+            }
+            
+            // Existing localization for individual processing
             wp_localize_script('pcr-discogs-api-admin', 'pcrDiscogsAjax', array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('pcr_download_images'),
@@ -673,7 +709,7 @@ class PCR_Discogs_API {
      * Updated extract_and_update_record_data method with debugging
      * Replace the existing method in your PCR_Discogs_API class with this version
     */
-    private function extract_and_update_record_data($product_id, $discogs_data) {
+    public function extract_and_update_record_data($product_id, $discogs_data) {
         $updated_fields = array();
         $errors = array();
         
@@ -778,7 +814,7 @@ class PCR_Discogs_API {
     /**
      * NEW: Process genres text and create/assign categories
      */
-    private function process_genres_to_categories($product_id, $genres_text) {
+    public function process_genres_to_categories($product_id, $genres_text) {
         $created_categories = array();
         $assigned_categories = array();
         $errors = array();
