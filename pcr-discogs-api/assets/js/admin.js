@@ -1,8 +1,3 @@
-/**
- * PCR Discogs API - Admin JavaScript
- * Version: 1.0.2
- */
-
 (function($) {
     'use strict';
 
@@ -15,7 +10,7 @@
     });
 
     /**
-     * Main Admin Object
+     * Main Admin Object (UPDATED)
      */
     const PCRDiscogsAdmin = {
         
@@ -29,21 +24,24 @@
         },
 
         /**
-         * Bind event handlers
+         * Bind event handlers (UPDATED - add new button handler)
          */
         bindEvents: function() {
             // Test API connection button
             $(document).on('click', '.pcr-test-api', this.testApiConnection);
             
-            // Download images button
+            // Download images button (existing)
             $(document).on('click', '.pcr-download-images', this.downloadImages);
+            
+            // NEW: Download record data button
+            $(document).on('click', '.pcr-download-record-data', this.downloadRecordData);
             
             // Save settings form
             $(document).on('submit', '#pcr-settings-form', this.saveSettings);
         },
 
         /**
-         * Test API connection
+         * Test API connection (existing method)
          */
         testApiConnection: function(e) {
             e.preventDefault();
@@ -109,7 +107,7 @@
         },
 
         /**
-         * Download images from Discogs
+         * Download images from Discogs (existing method)
          */
         downloadImages: function(e) {
             e.preventDefault();
@@ -182,7 +180,90 @@
         },
 
         /**
-         * Save settings
+         * NEW: Download record data from Discogs
+         */
+        downloadRecordData: function(e) {
+            e.preventDefault();
+            
+            const $button = $(this);
+            const productId = $button.data('product-id');
+            const $statusDiv = $('.pcr-record-data-status');
+            const originalText = $button.text();
+            
+            // Show loading state
+            $button.html('<span class="pcr-loading"></span> Downloading record data...')
+                   .prop('disabled', true);
+            
+            $statusDiv.html('<div class="pcr-notice info"><p>Downloading record data from Discogs...</p></div>');
+            
+            // Make AJAX call
+            $.ajax({
+                url: pcrDiscogsAjax.ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'pcr_download_record_data',
+                    product_id: productId,
+                    nonce: pcrDiscogsAjax.nonce
+                },
+                timeout: 30000 // 30 seconds for data download
+            })
+            .done(function(response) {
+                if (response.success) {
+                    const data = response.data;
+                    let successMsg = data.message + '<br><strong>Release:</strong> ' + data.release_title;
+                    
+                    if (data.updated_fields && data.updated_fields.length > 0) {
+                        successMsg += '<br><strong>Updated:</strong><br>';
+                        data.updated_fields.forEach(function(field) {
+                            successMsg += '• ' + field + '<br>';
+                        });
+                    }
+                    
+                    if (data.errors && data.errors.length > 0) {
+                        successMsg += '<br><strong>Warnings:</strong><br>';
+                        data.errors.forEach(function(error) {
+                            successMsg += '• ' + error + '<br>';
+                        });
+                    }
+                    
+                    $statusDiv.html('<div class="pcr-notice success"><p>' + successMsg + '</p></div>');
+                    
+                    // Show success on button temporarily
+                    $button.html('✅ Record Data Downloaded');
+                    
+                    // Reload the page after 3 seconds to show updated fields
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                } else {
+                    $statusDiv.html('<div class="pcr-notice error"><p>Error downloading record data: ' + response.data + '</p></div>');
+                }
+            })
+            .fail(function(xhr) {
+                let errorMsg = 'Error downloading record data: ';
+                
+                if (xhr.status === 0) {
+                    errorMsg += 'Network error or timeout';
+                } else if (xhr.responseJSON && xhr.responseJSON.data) {
+                    errorMsg += xhr.responseJSON.data;
+                } else {
+                    errorMsg += 'HTTP ' + xhr.status;
+                }
+                
+                $statusDiv.html('<div class="pcr-notice error"><p>' + errorMsg + '</p></div>');
+            })
+            .always(function() {
+                // Reset button after 5 seconds if not reloading
+                setTimeout(function() {
+                    if (!$button.html().includes('✅')) {
+                        $button.html(originalText).prop('disabled', false);
+                    }
+                }, 5000);
+            });
+        },
+
+        /**
+         * Save settings (existing method)
          */
         saveSettings: function(e) {
             const $form = $(this);
@@ -198,7 +279,7 @@
         },
 
         /**
-         * Check API status
+         * Check API status (existing method)
          */
         checkApiStatus: function() {
             // The status is already shown in PHP, just add some styling
@@ -206,7 +287,7 @@
         },
 
         /**
-         * Initialize tooltips
+         * Initialize tooltips (existing method)
          */
         initTooltips: function() {
             // Add tooltips to form fields
@@ -219,7 +300,7 @@
         },
 
         /**
-         * Show admin notice
+         * Show admin notice (existing method)
          */
         showNotice: function(message, type = 'info') {
             const noticeHtml = `

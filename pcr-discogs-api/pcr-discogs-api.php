@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.6
+ * Version: 1.0.7
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.6');
+define('PCR_DISCOGS_API_VERSION', '1.0.7');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -42,7 +42,7 @@ class PCR_Discogs_API {
     }
     
     /**
-     * Initialize the plugin
+     * Initialize the plugin (UPDATED - add new AJAX handler)
      */
     public function init() {
         // Load text domain for translations
@@ -54,7 +54,12 @@ class PCR_Discogs_API {
             add_action('admin_init', array($this, 'admin_init'));
             add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
             add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
+            
+            // Existing AJAX handler
             add_action('wp_ajax_pcr_download_discogs_images', array($this, 'ajax_download_discogs_images'));
+            
+            // NEW: Add record data AJAX handler
+            add_action('wp_ajax_pcr_download_record_data', array($this, 'ajax_download_record_data'));
         }
         
         // Initialize frontend functionality
@@ -222,7 +227,7 @@ class PCR_Discogs_API {
     }
     
     /**
-     * Discogs images meta box callback
+     * Discogs images meta box callback (UPDATED - add second button)
      */
     public function discogs_images_meta_box($post) {
         $discogs_release_id = get_field('discogs_release_id', $post->ID);
@@ -245,6 +250,8 @@ class PCR_Discogs_API {
                     </p>
                 <?php else: ?>
                     <p><strong><?php _e('Discogs Release ID:', 'pcr-discogs-api'); ?></strong> <?php echo esc_html($discogs_release_id); ?></p>
+                    
+                    <!-- EXISTING Images Button -->
                     <button type="button" class="button button-primary pcr-download-images" data-product-id="<?php echo $post->ID; ?>">
                         <?php _e('Download Images from Discogs', 'pcr-discogs-api'); ?>
                     </button>
@@ -252,9 +259,19 @@ class PCR_Discogs_API {
                         <input type="checkbox" id="pcr-force-overwrite" style="margin-right: 5px;" />
                         <?php _e('Force overwrite existing images', 'pcr-discogs-api'); ?>
                     </label>
+                    
+                    <!-- NEW: Record Data Button -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                        <button type="button" class="button button-secondary pcr-download-record-data" data-product-id="<?php echo $post->ID; ?>">
+                            <?php _e('Download Record Data', 'pcr-discogs-api'); ?>
+                        </button>
+                        <p class="description"><?php _e('Downloads year, country, and genres from Discogs', 'pcr-discogs-api'); ?></p>
+                    </div>
+                    
                 <?php endif; ?>
                 
                 <div class="pcr-download-status" style="margin-top: 15px;"></div>
+                <div class="pcr-record-data-status" style="margin-top: 15px;"></div>
             <?php endif; ?>
         </div>
         
@@ -585,6 +602,104 @@ class PCR_Discogs_API {
         update_post_meta($product_id, '_product_image_gallery', implode(',', $all_image_ids));
         
         error_log("PCR DEBUG: Updated gallery for product {$product_id} with images: " . implode(',', $all_image_ids));
+    }
+
+    // -------------------------------------------
+    // 2025-08-14
+
+    /**
+     * NEW: AJAX handler for downloading Discogs record data
+     */
+    public function ajax_download_record_data() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'pcr_download_images')) {
+            wp_die(__('Security check failed', 'pcr-discogs-api'));
+        }
+        
+        // Check user permissions
+        if (!current_user_can('edit_products')) {
+            wp_die(__('Insufficient permissions', 'pcr-discogs-api'));
+        }
+        
+        $product_id = intval($_POST['product_id']);
+        $discogs_release_id = get_field('discogs_release_id', $product_id);
+        $api_token = get_option('pcr_discogs_api_token', '');
+        
+        if (empty($discogs_release_id)) {
+            wp_send_json_error(__('No Discogs ID found for this product', 'pcr-discogs-api'));
+        }
+        
+        if (empty($api_token)) {
+            wp_send_json_error(__('No API token configured', 'pcr-discogs-api'));
+        }
+        
+        // Call Discogs API (reuse existing method)
+        $discogs_data = $this->get_discogs_release($discogs_release_id, $api_token);
+        
+        if (is_wp_error($discogs_data)) {
+            wp_send_json_error($discogs_data->get_error_message());
+        }
+        
+        // Extract and update record data
+        $result = $this->extract_and_update_record_data($product_id, $discogs_data);
+        
+        if (is_wp_error($result)) {
+            wp_send_json_error($result->get_error_message());
+        }
+        
+        wp_send_json_success($result);
+    }
+
+    /**
+     * NEW: Extract record data from Discogs API response and update ACF fields
+     */
+    private function extract_and_update_record_data($product_id, $discogs_data) {
+        $updated_fields = array();
+        $errors = array();
+        
+        // Extract Year
+        if (isset($discogs_data['year']) && !empty($discogs_data['year'])) {
+            $year = intval($discogs_data['year']);
+            if ($year > 0) {
+                update_field('year', $year, $product_id);
+                $updated_fields[] = 'Year: ' . $year;
+            }
+        } else {
+            $errors[] = 'Year not found in Discogs data';
+        }
+        
+        // Extract Country
+        if (isset($discogs_data['country']) && !empty($discogs_data['country'])) {
+            $country = sanitize_text_field($discogs_data['country']);
+            update_field('country_of_origin', $country, $product_id);
+            $updated_fields[] = 'Country: ' . $country;
+        } else {
+            $errors[] = 'Country not found in Discogs data';
+        }
+        
+        // Extract Genres (comma-separated)
+        if (isset($discogs_data['genres']) && is_array($discogs_data['genres']) && !empty($discogs_data['genres'])) {
+            $genres_array = array_map('sanitize_text_field', $discogs_data['genres']);
+            $genres_string = implode(', ', $genres_array);
+            update_field('genres', $genres_string, $product_id);
+            $updated_fields[] = 'Genres: ' . $genres_string;
+        } else {
+            $errors[] = 'Genres not found in Discogs data';
+        }
+        
+        // Prepare response
+        if (empty($updated_fields)) {
+            return new WP_Error('no_data', __('No record data could be extracted from Discogs', 'pcr-discogs-api'));
+        }
+        
+        $response = array(
+            'message' => sprintf(__('Successfully updated %d field(s)', 'pcr-discogs-api'), count($updated_fields)),
+            'updated_fields' => $updated_fields,
+            'errors' => $errors,
+            'release_title' => isset($discogs_data['title']) ? $discogs_data['title'] : 'Unknown Release'
+        );
+        
+        return $response;
     }
 
 }
