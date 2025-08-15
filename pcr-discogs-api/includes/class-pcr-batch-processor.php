@@ -350,7 +350,8 @@ class PCR_Discogs_Batch_Processor {
     }
     
     /**
-     * Process a single product in the batch
+     * UPDATED: process_single_product method with debugging and proper boolean handling
+     * Replace this method in your class-pcr-batch-processor.php file
      */
     private function process_single_product($product_id, $options) {
         $api_token = get_option('pcr_discogs_api_token', '');
@@ -364,6 +365,20 @@ class PCR_Discogs_Batch_Processor {
             'operations' => array(),
             'errors' => array()
         );
+        
+        // DEBUG: Log exactly what options we received
+        error_log("PCR BATCH DEBUG - Product: " . get_the_title($product_id));
+        error_log("PCR BATCH DEBUG - Raw options received: " . print_r($options, true));
+        error_log("PCR BATCH DEBUG - search_internet_for_photos field: " . ($search_photos ? 'true' : 'false'));
+        
+        // IMPORTANT: Convert string booleans to actual booleans
+        $process_images = ($options['process_images'] === true || $options['process_images'] === 'true' || $options['process_images'] === '1');
+        $process_data = ($options['process_data'] === true || $options['process_data'] === 'true' || $options['process_data'] === '1');
+        $process_categories = ($options['process_categories'] === true || $options['process_categories'] === 'true' || $options['process_categories'] === '1');
+        
+        error_log("PCR BATCH DEBUG - Converted process_images: " . ($process_images ? 'TRUE' : 'FALSE'));
+        error_log("PCR BATCH DEBUG - Converted process_data: " . ($process_data ? 'TRUE' : 'FALSE'));
+        error_log("PCR BATCH DEBUG - Converted process_categories: " . ($process_categories ? 'TRUE' : 'FALSE'));
         
         if (empty($release_id)) {
             $result['errors'][] = 'No Discogs Release ID found';
@@ -384,29 +399,39 @@ class PCR_Discogs_Batch_Processor {
         }
         
         // Process images if requested and allowed
-        if ($options['process_images'] && $search_photos) {
+        if ($process_images && $search_photos) {
+            error_log("PCR BATCH DEBUG - PROCESSING IMAGES: Both conditions met");
             $image_result = $this->main_plugin->smart_download_and_attach_images($product_id, $discogs_data, false);
             if (is_wp_error($image_result)) {
                 $result['errors'][] = 'Images: ' . $image_result->get_error_message();
             } else {
                 $result['operations'][] = 'Images: ' . $image_result['images_downloaded'] . ' downloaded';
             }
-        } elseif ($options['process_images'] && !$search_photos) {
+        } elseif ($process_images && !$search_photos) {
+            error_log("PCR BATCH DEBUG - SKIPPING IMAGES: process_images=true but search_photos=false");
             $result['operations'][] = 'Images: Skipped (search_internet_for_photos = false)';
+        } else {
+            error_log("PCR BATCH DEBUG - SKIPPING IMAGES: process_images=false");
+            $result['operations'][] = 'Images: Skipped (not requested)';
         }
         
         // Process record data if requested
-        if ($options['process_data']) {
+        if ($process_data) {
+            error_log("PCR BATCH DEBUG - PROCESSING DATA");
             $data_result = $this->main_plugin->extract_and_update_record_data($product_id, $discogs_data);
             if (is_wp_error($data_result)) {
                 $result['errors'][] = 'Data: ' . $data_result->get_error_message();
             } else {
                 $result['operations'][] = 'Data: ' . count($data_result['updated_fields']) . ' fields updated';
             }
+        } else {
+            error_log("PCR BATCH DEBUG - SKIPPING DATA: not requested");
+            $result['operations'][] = 'Data: Skipped (not requested)';
         }
         
         // Process categories if requested
-        if ($options['process_categories']) {
+        if ($process_categories) {
+            error_log("PCR BATCH DEBUG - PROCESSING CATEGORIES");
             $genres = get_field('genres', $product_id);
             if (!empty($genres)) {
                 $categories_result = $this->main_plugin->process_genres_to_categories($product_id, $genres);
@@ -418,11 +443,15 @@ class PCR_Discogs_Batch_Processor {
             } else {
                 $result['operations'][] = 'Categories: No genres data available';
             }
+        } else {
+            error_log("PCR BATCH DEBUG - SKIPPING CATEGORIES: not requested");
+            $result['operations'][] = 'Categories: Skipped (not requested)';
         }
         
         $result['success'] = empty($result['errors']);
         return $result;
     }
+
 }
 
 // REQURIEMENT :: Add to your main plugin initialization:

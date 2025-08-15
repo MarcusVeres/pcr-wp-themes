@@ -121,19 +121,33 @@
             $('#pcr-step-' + step).show();
         },
 
+        /**
+         * UPDATED: startProcessing method with explicit boolean conversion
+         * Replace this method in your batch.js file
+         */
         startProcessing: function() {
             if (this.candidates.length === 0) {
                 alert('No products to process. Please scan first.');
                 return;
             }
 
-            // Get processing options
+            // Get processing options with explicit boolean conversion
+            const processImages = $('#pcr-process-images').is(':checked');
+            const processData = $('#pcr-process-data').is(':checked');
+            const processCategories = $('#pcr-process-categories').is(':checked');
+            
             this.processingOptions = {
-                process_images: $('#pcr-process-images').is(':checked'),
-                process_data: $('#pcr-process-data').is(':checked'),
-                process_categories: $('#pcr-process-categories').is(':checked'),
+                process_images: processImages,
+                process_data: processData,
+                process_categories: processCategories,
                 delay: parseInt($('#pcr-processing-speed').val())
             };
+
+            // DEBUG: Log what we're sending
+            console.log('PCR BATCH DEBUG - Processing options:', this.processingOptions);
+            console.log('PCR BATCH DEBUG - Images checkbox checked:', processImages);
+            console.log('PCR BATCH DEBUG - Data checkbox checked:', processData);
+            console.log('PCR BATCH DEBUG - Categories checkbox checked:', processCategories);
 
             // Initialize results
             this.results.total = this.candidates.length;
@@ -150,6 +164,7 @@
             
             // Start processing
             this.logMessage('Starting batch processing...', 'info');
+            this.logMessage(`Options: Images=${processImages}, Data=${processData}, Categories=${processCategories}`, 'info');
             $('#pcr-pause-processing').show();
             
             this.processNextItem();
