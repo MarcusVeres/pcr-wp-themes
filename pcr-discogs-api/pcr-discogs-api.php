@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.15
+ * Version: 1.0.18
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.15');
+define('PCR_DISCOGS_API_VERSION', '1.0.18');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -42,6 +42,7 @@ class PCR_Discogs_API {
         
         // Initialize batch processor AFTER main init
         add_action('init', array($this, 'init_batch_processor'), 20); // Priority 20
+        add_action('init', array($this, 'init_image_cleaner'), 22);
     }
 
     /**
@@ -58,6 +59,20 @@ class PCR_Discogs_API {
                 $this->batch_processor = new PCR_Discogs_Batch_Processor($this);
             } else {
                 error_log("PCR DEBUG: Batch processor file not found!");
+            }
+        }
+    }
+
+    /**
+     * Initialize image cleaner 
+     */
+    public function init_image_cleaner() {
+        if( is_admin()) {
+            $cleanup_file = PCR_DISCOGS_API_PLUGIN_DIR . 'includes/class-pcr-image-cleanup.php';
+            
+            if (file_exists($cleanup_file)) {
+                require_once($cleanup_file);
+                $this->image_cleanup = new PCR_Image_Cleanup($this);
             }
         }
     }
@@ -619,7 +634,7 @@ class PCR_Discogs_API {
     /**
      * Categorize existing images by source
     */
-    private function categorize_existing_images($product_id) {
+    public function categorize_existing_images($product_id) {
         $existing_gallery = get_post_meta($product_id, '_product_image_gallery', true);
         $existing_ids = !empty($existing_gallery) ? explode(',', $existing_gallery) : array();
         $thumbnail_id = get_post_thumbnail_id($product_id);
