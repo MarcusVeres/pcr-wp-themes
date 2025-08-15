@@ -342,19 +342,21 @@ class PCR_Image_Cleanup {
                 .done(function(response) {
                     if (response.success) {
                         const data = response.data;
-                        $results.html('<div class="notice notice-success"><p><strong>✅ Complete!</strong><br>' + 
+                        let resultHtml = '<div class="notice notice-success"><p><strong>✅ Complete!</strong><br>' + 
                             'Deleted ' + data.deleted_count + ' Discogs images<br>' +
-                            'Freed up approximately ' + data.size_freed + ' of storage</p></div>');
+                            'Freed up approximately ' + data.size_freed + ' of storage';
+                        
+                        // Show cleanup info if any products were cleaned
+                        if (data.cleaned_products > 0) {
+                            resultHtml += '<br>Fixed orphaned references in ' + data.cleaned_products + ' products';
+                        }
+                        
+                        resultHtml += '</p></div>';
+                        $results.html(resultHtml);
                     } else {
                         $results.html('<div class="notice notice-error"><p>Error: ' + response.data + '</p></div>');
                     }
                 })
-                .fail(function() {
-                    $results.html('<div class="notice notice-error"><p>Network error or timeout occurred</p></div>');
-                })
-                .always(function() {
-                    $button.prop('disabled', false).text('🗑️ Delete ALL Discogs Images');
-                });
             });
         });
         </script>
@@ -461,7 +463,8 @@ class PCR_Image_Cleanup {
     }
     
     /**
-     * Delete all Discogs images from the site
+     * Delete all Discogs images from the site + cleanup orphaned references
+     * Replace this method in your class-pcr-image-cleanup.php file
      */
     private function delete_all_discogs_images() {
         global $wpdb;
@@ -479,6 +482,7 @@ class PCR_Image_Cleanup {
         $deleted_count = 0;
         $total_size = 0;
         
+        // Delete the actual image files
         foreach ($discogs_image_ids as $attachment_id) {
             // Get file size before deletion
             $file_path = get_attached_file($attachment_id);
@@ -492,12 +496,71 @@ class PCR_Image_Cleanup {
             }
         }
         
+        // NOW: Clean up orphaned references in product galleries and thumbnails
+        $cleaned_products = $this->cleanup_orphaned_image_references();
+        
         return array(
             'deleted_count' => $deleted_count,
-            'size_freed' => $this->format_bytes($total_size)
+            'size_freed' => $this->format_bytes($total_size),
+            'cleaned_products' => $cleaned_products
         );
     }
-    
+
+    /**
+     * Clean up orphaned image references in product galleries and thumbnails
+     * Add this method to your class-pcr-image-cleanup.php file
+     */
+    private function cleanup_orphaned_image_references() {
+        // Get all products
+        $products = get_posts(array(
+            'post_type' => 'product',
+            'post_status' => 'any',
+            'posts_per_page' => -1
+        ));
+        
+        $fixed_count = 0;
+        
+        foreach ($products as $product) {
+            $product_id = $product->ID;
+            $fixed = false;
+            
+            // Check gallery
+            $gallery = get_post_meta($product_id, '_product_image_gallery', true);
+            if (!empty($gallery)) {
+                $gallery_ids = explode(',', $gallery);
+                $valid_ids = array();
+                
+                foreach ($gallery_ids as $attachment_id) {
+                    if (!empty($attachment_id) && get_post($attachment_id)) {
+                        $valid_ids[] = $attachment_id;
+                    } else {
+                        error_log("PCR CLEANUP: Removing orphaned gallery reference {$attachment_id} from product {$product_id}");
+                        $fixed = true;
+                    }
+                }
+                
+                if ($fixed) {
+                    update_post_meta($product_id, '_product_image_gallery', implode(',', $valid_ids));
+                }
+            }
+            
+            // Check featured image
+            $thumbnail_id = get_post_thumbnail_id($product_id);
+            if ($thumbnail_id && !get_post($thumbnail_id)) {
+                error_log("PCR CLEANUP: Removing orphaned thumbnail reference {$thumbnail_id} from product {$product_id}");
+                delete_post_meta($product_id, '_thumbnail_id');
+                $fixed = true;
+            }
+            
+            if ($fixed) {
+                $fixed_count++;
+            }
+        }
+        
+        error_log("PCR CLEANUP: Fixed orphaned references in {$fixed_count} products");
+        return $fixed_count;
+    }
+
     /**
      * Format bytes for human reading
      */

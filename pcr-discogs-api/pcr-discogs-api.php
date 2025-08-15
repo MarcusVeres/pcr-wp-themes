@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.18
+ * Version: 1.0.19
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.18');
+define('PCR_DISCOGS_API_VERSION', '1.0.19');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
