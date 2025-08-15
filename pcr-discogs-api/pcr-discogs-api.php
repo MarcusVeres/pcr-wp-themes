@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.10
+ * Version: 1.0.15
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.10');
+define('PCR_DISCOGS_API_VERSION', '1.0.15');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -40,8 +40,8 @@ class PCR_Discogs_API {
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
         
-        // Initialize batch processor
-        add_action('init', array($this, 'init_batch_processor'));
+        // Initialize batch processor AFTER main init
+        add_action('init', array($this, 'init_batch_processor'), 20); // Priority 20
     }
 
     /**
@@ -49,8 +49,16 @@ class PCR_Discogs_API {
      */
     public function init_batch_processor() {
         if (is_admin()) {
-            require_once(PCR_DISCOGS_API_PLUGIN_DIR . 'includes/class-pcr-batch-processor.php');
-            $this->batch_processor = new PCR_Discogs_Batch_Processor($this);
+            $batch_file = PCR_DISCOGS_API_PLUGIN_DIR . 'includes/class-pcr-batch-processor.php';
+            error_log("PCR DEBUG: Looking for batch file at: " . $batch_file);
+            error_log("PCR DEBUG: File exists: " . (file_exists($batch_file) ? 'YES' : 'NO'));
+            
+            if (file_exists($batch_file)) {
+                require_once($batch_file);
+                $this->batch_processor = new PCR_Discogs_Batch_Processor($this);
+            } else {
+                error_log("PCR DEBUG: Batch processor file not found!");
+            }
         }
     }
 
@@ -456,9 +464,20 @@ class PCR_Discogs_API {
     public function admin_enqueue_scripts($hook) {
         global $post_type;
         
+        // Get current page
+        $current_page = $_GET['page'] ?? '';
+        
+        // TEMPORARY DEBUG: Log when we're on any of our pages
+        if (strpos($hook, 'discogs') !== false || $current_page === 'pcr-discogs-batch') {
+            error_log("PCR DEBUG: Hook name is: " . $hook);
+            error_log("PCR DEBUG: Current page parameter: " . $current_page);
+            error_log("PCR DEBUG: Are we on batch page? " . ($current_page === 'pcr-discogs-batch' ? 'YES' : 'NO'));
+        }
+
         // Load on product edit screens and our plugin pages
         if (($post_type === 'product' && in_array($hook, array('post.php', 'post-new.php'))) || 
-            strpos($hook, 'pcr-discogs-api') !== false) {
+            strpos($hook, 'discogs-api') !== false ||  // Changed from 'pcr-discogs-api' to 'discogs-api'
+            $current_page === 'pcr-discogs-batch') {
             
             wp_enqueue_style(
                 'pcr-discogs-api-admin',

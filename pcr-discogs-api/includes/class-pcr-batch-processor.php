@@ -10,6 +10,7 @@ class PCR_Discogs_Batch_Processor {
     private $main_plugin;
     
     public function __construct($main_plugin) {
+        error_log("PCR DEBUG: Batch processor initialized successfully");
         $this->main_plugin = $main_plugin;
         $this->init_hooks();
     }
@@ -28,6 +29,7 @@ class PCR_Discogs_Batch_Processor {
      * Add batch processing admin page
      */
     public function add_batch_admin_page() {
+        error_log("PCR DEBUG: Adding batch admin page");
         add_submenu_page(
             'pcr-discogs-api',
             __('Batch Processing', 'pcr-discogs-api'),
