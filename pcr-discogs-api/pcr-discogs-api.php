@@ -3,7 +3,7 @@
  * Plugin Name: PCR Discogs API
  * Plugin URI: https://pcr.sarazstudio.com
  * Description: Discogs API integration for Perfect Circle Records vinyl store
- * Version: 1.0.19
+ * Version: 1.0.20
  * Author: Marcus and Claude
  * Author URI: https://pcr.sarazstudio.com
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('PCR_DISCOGS_API_VERSION', '1.0.19');
+define('PCR_DISCOGS_API_VERSION', '1.0.20');
 define('PCR_DISCOGS_API_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('PCR_DISCOGS_API_PLUGIN_FILE', __FILE__);
@@ -765,6 +765,29 @@ class PCR_Discogs_API {
             $updated_fields[] = 'Country: ' . $country;
         } else {
             $errors[] = 'Country not found in Discogs data';
+        }
+
+        // Extract Labels (add this to your existing method)
+        if (isset($discogs_data['labels']) && is_array($discogs_data['labels']) && !empty($discogs_data['labels'])) {
+            // Get the first label's name (most common use case)
+            $primary_label = sanitize_text_field($discogs_data['labels'][0]['name']);
+            
+            // Or combine multiple labels with commas if there are several
+            $all_labels = array();
+            foreach ($discogs_data['labels'] as $label) {
+                if (!empty($label['name'])) {
+                    $all_labels[] = sanitize_text_field($label['name']);
+                }
+            }
+            $labels_string = implode(', ', $all_labels);
+            
+            // Update the field (assuming you have a 'label' ACF field)
+            update_field('label', $labels_string, $product_id);
+            $updated_fields[] = 'Labels (' . count($all_labels) . '): ' . $labels_string;
+            
+            error_log("PCR DEBUG - Labels from Discogs: " . print_r($discogs_data['labels'], true));
+        } else {
+            $errors[] = 'Labels not found in Discogs data';
         }
         
         // Extract Genres (comma-separated) - WITH DEBUGGING
